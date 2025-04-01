@@ -17,26 +17,10 @@
  *  under the License.
  */
 
-package ports
-
-import (
-	"context"
-
-	"github.com/apache/synapse-go/internal/pkg/core/synctx"
-)
-
-// Secondary/Driven Port
-type InboundEndpoint interface {
-	Start(ctx context.Context, mediator InboundMessageMediator) error
-	Stop() error
-}
-
-// Primary/Driving Port
-type InboundMessageMediator interface {
-	MediateInboundMessage(ctx context.Context, seqName string, msg *synctx.MsgContext) error
-}
-
-// Primary/Driving Port
-type APIMessageMediator interface{
-	MediateAPIMessage(ctx context.Context, msg *synctx.MsgContext) error
-}
+ package domain
+ 
+ type Sequence struct {
+	 MediatorList []Mediator
+	 Name         string
+ }
+ 

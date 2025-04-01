@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	_api "github.com/apache/synapse-go/internal/app/adapters/api"
 	"github.com/apache/synapse-go/internal/app/adapters/inbound"
 	"github.com/apache/synapse-go/internal/app/core/domain"
 	"github.com/apache/synapse-go/internal/app/core/ports"
@@ -125,12 +126,35 @@ func (d *Deployer) DeployAPIs(ctx context.Context, fileName string, xmlData stri
 	api := types.API{}
 	newApi, err := api.Unmarshal(xmlData, position)
 	if err != nil {
-		d.logger.Error("Error unmarshalling sequence:", "error", err)
+		d.logger.Error("Error unmarshalling api:", "error", err)
 		return
 	}
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
 	configContext.AddAPI(newApi)
-	d.logger.Info("Deployed API: " + newApi.Name)
+
+	var resources []domain.Resource
+	for _, resource := range newApi.Resources {
+		var domainMediators []domain.Mediator
+		for _, mediator := range resource.InSequence.MediatorList {
+			domainMediators = append(domainMediators, domain.Mediator(mediator))
+		}
+
+		resources = append(resources, domain.Resource{
+			Methods:     resource.Methods,
+			URITemplate: resource.URITemplate,
+			InSequence: domain.Sequence{
+				MediatorList: domainMediators,
+			},
+		})
+	}
+	fmt.Println("Deployed API: ", newApi.Name)
+	
+	_api.InitializeRouter(ctx, domain.APIConfig{
+		Context:   newApi.Context,
+		Name:      newApi.Name,
+		Resources: resources,
+	})
+
 }
 
 func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData string) {
@@ -138,7 +162,7 @@ func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData 
 	inboundEp := types.Inbound{}
 	newInbound, err := inboundEp.Unmarshal(xmlData, position)
 	if err != nil {
-		d.logger.Error("Error unmarshalling sequence:", "error", err)
+		d.logger.Error("Error unmarshalling inbound:", "error", err)
 		return
 	}
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
