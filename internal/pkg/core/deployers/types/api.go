@@ -136,7 +136,7 @@ func (r *Resource) decodeSequence(decoder *xml.Decoder, position artifacts.Posit
 		if err != nil {
 			return artifacts.Sequence{}, err
 		}
-		if startElem, ok := token.(xml.StartElement); ok && startElem.Name.Local == "sequence" {
+		if startElem, ok := token.(xml.StartElement); ok && startElem.Name.Local == sequenceType {
 			break
 		}
 	}

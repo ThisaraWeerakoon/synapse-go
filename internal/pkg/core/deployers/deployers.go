@@ -125,7 +125,7 @@ func (d *Deployer) DeployAPIs(ctx context.Context, fileName string, xmlData stri
 	api := types.API{}
 	newApi, err := api.Unmarshal(xmlData, position)
 	if err != nil {
-		d.logger.Error("Error unmarshalling sequence:", "error", err)
+		d.logger.Error("Error unmarshalling api:", "error", err)
 		return
 	}
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
@@ -138,7 +138,7 @@ func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData 
 	inboundEp := types.Inbound{}
 	newInbound, err := inboundEp.Unmarshal(xmlData, position)
 	if err != nil {
-		d.logger.Error("Error unmarshalling sequence:", "error", err)
+		d.logger.Error("Error unmarshalling inbound:", "error", err)
 		return
 	}
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
