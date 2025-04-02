@@ -130,25 +130,59 @@ func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, posit
 }
 
 func (r *Resource) decodeSequence(decoder *xml.Decoder, position artifacts.Position, sequenceType string, res artifacts.Resource) (artifacts.Sequence, error) {
+	
 
-	for {
-		token, err := decoder.Token()
-		if err != nil {
-			return artifacts.Sequence{}, err
-		}
-		if startElem, ok := token.(xml.StartElement); ok && startElem.Name.Local == sequenceType {
-			break
-		}
-	}
+	// for {
+	// 	token, err := decoder.Token()
+	// 	if err != nil {
+	// 		return artifacts.Sequence{}, err
+	// 	}
+	// 	if startElem, ok := token.(xml.StartElement); ok && startElem.Name.Local == sequenceType {
+	// 		break
+	// 	}
+	// }
 	line, _ := decoder.InputPos()
-	decodeSeq := Sequence{}
-	seq, err := decodeSeq.unmarshal(decoder, artifacts.Position{
+	
+	position = artifacts.Position{
 		FileName:  position.FileName,
 		LineNo:    line,
 		Hierarchy: position.Hierarchy + "->" + res.URITemplate + "->" + sequenceType,
-	})
-	if err != nil {
-		return artifacts.Sequence{}, err
 	}
-	return seq, nil
+	var mediatorList []artifacts.Mediator
+	if position.Hierarchy == "" {
+		position.Hierarchy = sequenceType
+	} 
+OuterLoop:
+	for {
+		token, err := decoder.Token()
+		if err != nil {
+			break
+		}
+		line, _ := decoder.InputPos()
+		position := artifacts.Position{LineNo: line, FileName: position.FileName, Hierarchy: position.Hierarchy}
+		switch element := token.(type) {
+		case xml.StartElement:
+			switch element.Name.Local {
+			case "log":
+				logMediator := LogMediator{}
+				mediator, err := logMediator.Unmarshal(decoder, element, position)
+				if err != nil {
+					return artifacts.Sequence{}, err
+				}
+				mediatorList = append(mediatorList, mediator)
+			}
+		case xml.EndElement:
+			// Stop when the </sequence> tag is encountered
+			if element.Name.Local == sequenceType {
+				break OuterLoop
+			}
+		}
+	}
+	return artifacts.Sequence{MediatorList: mediatorList, Position: position}, nil
 }
+
+// 	if err != nil {
+// 		return artifacts.Sequence{}, err
+// 	}
+// 	return seq, nil
+// }
