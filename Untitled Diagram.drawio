@@ -72,6 +72,13 @@
         <mxCell id="l7raoQd2dg0srGS7qnQP-23" value="MediationEngine" style="shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;" vertex="1" parent="1">
           <mxGeometry x="-235" y="890" width="250" height="60" as="geometry" />
         </mxCell>
+        <mxCell id="l7raoQd2dg0srGS7qnQP-29" value="d&amp;nbsp;" style="edgeStyle=none;orthogonalLoop=1;jettySize=auto;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="80" relative="1" as="geometry">
+            <mxPoint x="-10" y="490" as="sourcePoint" />
+            <mxPoint x="70" y="490" as="targetPoint" />
+            <Array as="points" />
+          </mxGeometry>
+        </mxCell>
       </root>
     </mxGraphModel>
   </diagram>
