@@ -6,12 +6,12 @@
                 <message></message>
                 <property name="Log Property message" value="&quot;Welcome to HealthcareService&quot;"/>
             </log>
-            <call>
-                <endpoint key="QueryDoctorEP"/>
-            </call>
-            <respond/>
         </inSequence>
         <faultSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message></message>
+                <property name="false message" value="&quot;Fault Sequence&quot;"/>
+            </log>
         </faultSequence>
     </resource>
 </api>
