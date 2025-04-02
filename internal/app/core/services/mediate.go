@@ -27,14 +27,20 @@ import (
 
 type MediationService struct {
 	InboundMediationService ports.InboundMessageMediator
+	APIMediationService ports.APIMessageMediator
 }
 
-func NewMediationService(inboundMediationService ports.InboundMessageMediator) *MediationService {
+func NewMediationService(inboundMediationService ports.InboundMessageMediator, apiMediationService ports.APIMessageMediator) *MediationService {
 	return &MediationService{
 		InboundMediationService: inboundMediationService,
+		APIMediationService: apiMediationService,
 	}
 }
 
 func (s *MediationService) MediateInboundMessage(ctx context.Context, seqName string, msg *synctx.MsgContext) error {
 	return s.InboundMediationService.MediateInboundMessage(ctx, seqName, msg)
+}
+
+func (s *MediationService) MediateAPIMessage(ctx context.Context, msg *synctx.MsgContext) error {
+	return s.APIMediationService.MediateAPIMessage(ctx, msg)
 }
