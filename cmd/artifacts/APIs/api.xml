@@ -3,7 +3,7 @@
     <resource methods="GET" uri-template="/querydoctor/{category}">
         <inSequence>
             <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
-                <message></message>
+                <message>message from api get resource</message>
                 <property name="Log Property message" value="&quot;Welcome to HealthcareService&quot;"/>
             </log>
         </inSequence>
