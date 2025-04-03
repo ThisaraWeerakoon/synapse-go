@@ -14,7 +14,7 @@ import (
 // 	Config domain.APIConfig
 // }
 
-func InitializaRouter(ctx context.Context, config domain.APIConfig){
+func InitializeRouter(ctx context.Context, config domain.APIConfig){
 	router := http.NewServeMux()
 	mediationEngine :=mediation.NewMediationEngine()
 	for _, resource := range config.Resources {
