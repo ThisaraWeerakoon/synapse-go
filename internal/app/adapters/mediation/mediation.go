@@ -25,6 +25,7 @@ import (
 	"sync"
 	
 
+	"github.com/apache/synapse-go/internal/app/core/domain"
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
 	"github.com/apache/synapse-go/internal/pkg/core/utils"
@@ -73,7 +74,7 @@ func (m *MediationEngine) MediateInboundMessage(ctx context.Context, seqName str
 
 }
 
-func (m *MediationEngine) MediateAPIMessage(ctx context.Context, msg *synctx.MsgContext) error {
+func (m *MediationEngine) MediateAPIMessage(ctx context.Context, msg *synctx.MsgContext, inSequence domain.Sequence, falseSequence domain.Sequence) error {
 	waitgroup := ctx.Value(utils.WaitGroupKey).(*sync.WaitGroup)
 	// configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
 	waitgroup.Add(1)
