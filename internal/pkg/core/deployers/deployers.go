@@ -147,13 +147,14 @@ func (d *Deployer) DeployAPIs(ctx context.Context, fileName string, xmlData stri
 			},
 		})
 	}
-
+	fmt.Println("Deployed API: ", newApi.Name)
+	
 	_api.InitializeRouter(ctx, domain.APIConfig{
 		Context:   newApi.Context,
 		Name:      newApi.Name,
 		Resources: resources,
 	})
-	fmt.Println("Deployed API: ", newApi.Name)
+
 }
 
 func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData string) {
