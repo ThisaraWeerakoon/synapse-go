@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	_api "github.com/apache/synapse-go/internal/app/adapters/api"
 	"github.com/apache/synapse-go/internal/app/adapters/inbound"
 	"github.com/apache/synapse-go/internal/app/core/domain"
 	"github.com/apache/synapse-go/internal/app/core/ports"
@@ -131,30 +130,7 @@ func (d *Deployer) DeployAPIs(ctx context.Context, fileName string, xmlData stri
 	}
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
 	configContext.AddAPI(newApi)
-
-	var resources []domain.Resource
-	for _, resource := range newApi.Resources {
-		var domainMediators []domain.Mediator
-		for _, mediator := range resource.InSequence.MediatorList {
-			domainMediators = append(domainMediators, domain.Mediator(mediator))
-		}
-
-		resources = append(resources, domain.Resource{
-			Methods:     resource.Methods,
-			URITemplate: resource.URITemplate,
-			InSequence: domain.Sequence{
-				MediatorList: domainMediators,
-			},
-		})
-	}
 	fmt.Println("Deployed API: ", newApi.Name)
-	
-	_api.InitializeRouter(ctx, domain.APIConfig{
-		Context:   newApi.Context,
-		Name:      newApi.Name,
-		Resources: resources,
-	})
-
 }
 
 func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData string) {
