@@ -149,6 +149,17 @@ func (rs *RouterService) startServer(ctx context.Context) error {
 		}
 	}()
 
+	// Start a goroutine to monitor context cancellation and shut down server
+	go func() {
+		<-ctx.Done()
+		fmt.Println("Shutting down HTTP server...")
+		if err := rs.server.Shutdown(ctx); err != nil {
+			fmt.Printf("Error shutting down HTTP server: %v\n", err)
+		} else {
+			fmt.Println("HTTP server stopped gracefully")
+		}
+	}()
+
 	rs.started = true
 	return nil
 }
