@@ -34,14 +34,11 @@ func InitializeRouter(ctx context.Context, config domain.APIConfig){
 			}
 			msgContext.Message.RawPayload = body
 			msgContext.Message.ContentType = r.Header.Get("Content-Type")
-
-
-
-			mediationEngine.MediateAPIMessage(ctx, msgContext, resource.InSequence, resource.FaultSequence)
+			resource.exe\\\
 			fmt.Fprintf(w, "host, %s!", r.URL.Host)
 		})
 	}
-	http.ListenAndServe(":8000", router)
+	http.ListenAndServe(":8290", router)
 }
 
 
