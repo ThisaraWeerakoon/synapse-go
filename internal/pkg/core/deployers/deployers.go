@@ -206,17 +206,3 @@ func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData 
 		}
 	}(inboundEndpoint)
 }
-
-// Shutdown gracefully shuts down all services managed by the deployer
-func (d *Deployer) Shutdown(ctx context.Context) error {
-	// Shutdown the router service
-	if d.routerService != nil {
-		if err := d.routerService.Shutdown(ctx); err != nil {
-			return fmt.Errorf("failed to shutdown router service: %w", err)
-		}
-	}
-
-	// Other shutdown tasks can be added here
-
-	return nil
-}
