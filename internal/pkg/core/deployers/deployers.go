@@ -76,6 +76,7 @@ func (d *Deployer) UpdateLogger() {
 	if envPort := os.Getenv("SYNAPSE_HTTP_PORT"); envPort != "" {
 		listenAddr = ":" + envPort
 	}
+	listenAddr := ":8290" // Default port for http connection
 
 	return NewDeployerWithConfig(DeployerConfig{
 		BasePath:   basePath,
