@@ -32,6 +32,7 @@ import (
 	"github.com/apache/synapse-go/internal/app/core/ports"
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/deployers/types"
+	"github.com/apache/synapse-go/internal/pkg/core/router"
 	"github.com/apache/synapse-go/internal/pkg/core/utils"
 	"github.com/apache/synapse-go/internal/pkg/loggerfactory"
 )
@@ -40,11 +41,17 @@ const (
 	componentName = "deployers"
 )
 
+type DeployerConfig struct {
+	BasePath   string
+	ListenAddr string
+}
 
 type Deployer struct {
 	inboundMediator ports.InboundMessageMediator
+	routerService   *router.RouterService
 	basePath        string
 	logger 			*slog.Logger
+	config          DeployerConfig
 }
 
 // Synapse/
@@ -64,6 +71,29 @@ func NewDeployer(basePath string, inboundMediator ports.InboundMessageMediator) 
 
 func (d *Deployer) UpdateLogger() {
 	d.logger = loggerfactory.GetLogger(componentName,d)
+	// Check for environment variable override for HTTP listen address
+	listenAddr := ":8000" // Default port
+	if envPort := os.Getenv("SYNAPSE_HTTP_PORT"); envPort != "" {
+		listenAddr = ":" + envPort
+	}
+	listenAddr := ":8290" // Default port for http connection
+
+	return NewDeployerWithConfig(DeployerConfig{
+		BasePath:   basePath,
+		ListenAddr: listenAddr,
+	}, inboundMediator)
+}
+
+func NewDeployerWithConfig(config DeployerConfig, inboundMediator ports.InboundMessageMediator) *Deployer {
+	// Create router service with configured listen address
+	routerService := router.NewRouterService(config.ListenAddr)
+
+	return &Deployer{
+		basePath:        config.BasePath,
+		inboundMediator: inboundMediator,
+		routerService:   routerService,
+		config:          config,
+	}
 }
 
 func (d *Deployer) Deploy(ctx context.Context) error {
@@ -130,6 +160,13 @@ func (d *Deployer) DeployAPIs(ctx context.Context, fileName string, xmlData stri
 	}
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
 	configContext.AddAPI(newApi)
+
+	// Register the API with the router service
+	if err := d.routerService.RegisterAPI(ctx, newApi); err != nil {
+		fmt.Printf("Error registering API %s: %v\n", newApi.Name, err)
+		return
+	}
+
 	fmt.Println("Deployed API: ", newApi.Name)
 }
 
