@@ -19,6 +19,10 @@
 
 package artifacts
 
+import (
+	"github.com/apache/synapse-go/internal/pkg/core/synctx"
+)
+
 type Resource struct {
 	Methods       string
 	URITemplate   string
@@ -31,4 +35,15 @@ type API struct {
 	Name      string
 	Resources []Resource
 	Position  Position
+}
+
+func (r *Resource) Mediate(context *synctx.MsgContext) bool {
+	isSuccessInSeq := r.InSequence.Execute(context)
+	if !isSuccessInSeq {
+		isCompleteFaultSeq:= r.FaultSequence.Execute(context)
+		if !isCompleteFaultSeq {
+			return false
+		}
+	}
+	return true
 }

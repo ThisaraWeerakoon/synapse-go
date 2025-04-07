@@ -74,9 +74,9 @@ func (m *MediationEngine) MediateInboundMessage(ctx context.Context, seqName str
 
 }
 
-func (m *MediationEngine) MediateAPIMessage(ctx context.Context, msg *synctx.MsgContext, inSequence domain.Sequence, falseSequence domain.Sequence) error {
+func (m *MediationEngine) MediateAPIMessage(ctx context.Context, resourceName string ,msg *synctx.MsgContext) error {
 	waitgroup := ctx.Value(utils.WaitGroupKey).(*sync.WaitGroup)
-	// configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
+	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
 	waitgroup.Add(1)
 	go func() {
 		defer waitgroup.Done()
@@ -86,8 +86,12 @@ func (m *MediationEngine) MediateAPIMessage(ctx context.Context, msg *synctx.Msg
 			waitgroup.Done()
 			return
 		default:
-			//implementation of unnamed sequence
-			//sequence.Execute(msg)
+			api, exists := configContext.ApiMap[apiName]
+			if !exists {
+				fmt.Println("API " + apiName + " not found")
+				return
+			}
+			
 		}
 	}()
 	return nil
