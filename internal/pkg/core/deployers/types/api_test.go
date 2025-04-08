@@ -79,28 +79,113 @@ func TestAPI_Unmarshal(t *testing.T) {
 	assert.Equal(t, 6, logMediator.Position.LineNo)
 }
 
-func TestAPI_Unmarshal_EmptyAPI(t *testing.T) {
-	xmlData := `<api context="" name=""></api>`
-
-	position := artifacts.Position{
-		FileName: "testfile.xml",
-		LineNo:   1,
+func TestAPI_Unmarshal_ValidationErrors(t *testing.T) {
+	testCases := []struct {
+		name     string
+		xmlData  string
+		expected string
+	}{
+		{
+			name:     "Empty context",
+			xmlData:  `<api context="" name="TestAPI"></api>`,
+			expected: "API context is required",
+		},
+		{
+			name:     "Context without leading slash",
+			xmlData:  `<api context="test" name="TestAPI"></api>`,
+			expected: "API context must begin with '/' character",
+		},
+		{
+			name:     "Empty name",
+			xmlData:  `<api context="/test" name=""></api>`,
+			expected: "API name is required",
+		},
+		{
+			name:     "Missing version type",
+			xmlData:  `<api context="/test" name="TestAPI" version="1.0"></api>`,
+			expected: "both version and version-type must be specified together",
+		},
+		{
+			name:     "Invalid version type",
+			xmlData:  `<api context="/test" name="TestAPI" version="1.0" version-type="invalid"></api>`,
+			expected: "version-type must be either 'context' or 'url', got: invalid",
+		},
 	}
 
-	api := &API{}
-	result, err := api.Unmarshal(xmlData, position)
-	if err != nil {
-		t.Fatalf("Unmarshal() error = %v", err)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			position := artifacts.Position{
+				FileName: "testfile.xml",
+				LineNo:   1,
+			}
+
+			api := &API{}
+			_, err := api.Unmarshal(tc.xmlData, position)
+			if err == nil {
+				t.Errorf("Expected error for %s, got nil", tc.name)
+				return
+			}
+
+			if err.Error() != tc.expected {
+				t.Errorf("Expected error message '%s', got '%s'", tc.expected, err.Error())
+			}
+		})
+	}
+}
+
+func TestAPI_Unmarshal_WithVersioning(t *testing.T) {
+	testCases := []struct {
+		name        string
+		xmlData     string
+		context     string
+		version     string
+		versionType string
+	}{
+		{
+			name: "With URL versioning",
+			xmlData: `
+			<api context="/test" name="TestAPI" version="1.0" version-type="url">
+				<resource methods="GET" uri-template="/resource1"></resource>
+			</api>`,
+			context:     "/test",
+			version:     "1.0",
+			versionType: "url",
+		},
+		{
+			name: "With Context versioning",
+			xmlData: `
+			<api context="/test" name="TestAPI" version="1.0" version-type="context">
+				<resource methods="GET" uri-template="/resource1"></resource>
+			</api>`,
+			context:     "/test",
+			version:     "1.0",
+			versionType: "context",
+		},
 	}
 
-	if result.Context != "" {
-		t.Errorf("Expected empty context, got %s", result.Context)
-	}
-	if result.Name != "" {
-		t.Errorf("Expected empty name, got %s", result.Name)
-	}
-	if len(result.Resources) != 0 {
-		t.Fatalf("Expected 0 resources, got %d", len(result.Resources))
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			position := artifacts.Position{
+				FileName: "testfile.xml",
+				LineNo:   1,
+			}
+
+			api := &API{}
+			result, err := api.Unmarshal(tc.xmlData, position)
+			if err != nil {
+				t.Fatalf("Unmarshal() error = %v", err)
+			}
+
+			if result.Context != tc.context {
+				t.Errorf("Expected context '%s', got '%s'", tc.context, result.Context)
+			}
+			if result.Version != tc.version {
+				t.Errorf("Expected version '%s', got '%s'", tc.version, result.Version)
+			}
+			if result.VersionType != tc.versionType {
+				t.Errorf("Expected versionType '%s', got '%s'", tc.versionType, result.VersionType)
+			}
+		})
 	}
 }
 
