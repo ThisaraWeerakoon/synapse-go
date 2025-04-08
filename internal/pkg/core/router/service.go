@@ -153,7 +153,7 @@ func (rs *RouterService) startServer(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		fmt.Println("Shutting down HTTP server...")
-		if err := rs.server.Shutdown(ctx); err != nil {
+		if err := rs.Shutdown(ctx); err != nil {
 			fmt.Printf("Error shutting down HTTP server: %v\n", err)
 		} else {
 			fmt.Println("HTTP server stopped gracefully")
