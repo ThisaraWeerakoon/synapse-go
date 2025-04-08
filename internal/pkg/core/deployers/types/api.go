@@ -21,6 +21,7 @@ package types
 
 import (
 	"encoding/xml"
+	"fmt"
 	"strings"
 
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
@@ -34,12 +35,12 @@ type Resource struct {
 }
 
 type API struct {
-	Context   string               `xml:"context,attr"`
-	Name      string               `xml:"name,attr"`
-	Version   string               `xml:"version,attr"`
-	VersionType string             `xml:"version-type,attr"`
-	Resources []artifacts.Resource `xml:"resource"`
-	Position  artifacts.Position
+	Context     string               `xml:"context,attr"`
+	Name        string               `xml:"name,attr"`
+	Version     string               `xml:"version,attr"`
+	VersionType string               `xml:"version-type,attr"`
+	Resources   []artifacts.Resource `xml:"resource"`
+	Position    artifacts.Position
 }
 
 func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifacts.API, error) {
@@ -86,6 +87,29 @@ func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifact
 			break
 		}
 	}
+
+	// Validation checks
+	if newAPI.Context == "" {
+		return artifacts.API{}, fmt.Errorf("API context is required")
+	}
+
+	if newAPI.Name == "" {
+		return artifacts.API{}, fmt.Errorf("API name is required")
+	}
+
+	// Check version and versionType consistency
+	hasVersion := newAPI.Version != ""
+	hasVersionType := newAPI.VersionType != ""
+
+	if hasVersion != hasVersionType {
+		return artifacts.API{}, fmt.Errorf("both version and version-type must be specified together")
+	}
+
+	// Validate versionType if specified
+	if hasVersionType && newAPI.VersionType != "context" && newAPI.VersionType != "url" {
+		return artifacts.API{}, fmt.Errorf("version-type must be either 'context' or 'url', got: %s", newAPI.VersionType)
+	}
+
 	return newAPI, nil
 }
 
