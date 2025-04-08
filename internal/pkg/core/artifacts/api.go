@@ -31,10 +31,12 @@ type Resource struct {
 }
 
 type API struct {
-	Context   string
-	Name      string
-	Resources []Resource
-	Position  Position
+	Context       string
+	Name          string
+	Version       string
+	VersionType   string
+	Resources     []Resource
+	Position      Position
 }
 
 func (r *Resource) Mediate(context *synctx.MsgContext) bool {

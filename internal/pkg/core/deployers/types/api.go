@@ -36,6 +36,8 @@ type Resource struct {
 type API struct {
 	Context   string               `xml:"context,attr"`
 	Name      string               `xml:"name,attr"`
+	Version   string               `xml:"version,attr"`
+	VersionType string             `xml:"version-type,attr"`
 	Resources []artifacts.Resource `xml:"resource"`
 	Position  artifacts.Position
 }
@@ -60,6 +62,10 @@ func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifact
 					case "name":
 						newAPI.Name = attr.Value
 						newAPI.Position.Hierarchy = attr.Value
+					case "version":
+						newAPI.Version = attr.Value
+					case "version-type":
+						newAPI.VersionType = attr.Value
 					}
 				}
 			case "resource":
