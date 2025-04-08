@@ -40,7 +40,6 @@ package router
 import (
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"sync"
 
@@ -79,7 +78,7 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	// Register each resource in the API
 	for _, resource := range api.Resources {
 		pattern := resource.Methods + " " + api.Context + resource.URITemplate
-		rs.router.HandleFunc(pattern, rs.createHandlerFunc(api, resource))
+		rs.router.HandleFunc(pattern, rs.createHandlerFunc(resource))
 	}
 
 	// Start the server if it hasn't been started yet
@@ -93,29 +92,17 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 }
 
 // createHandlerFunc creates an HTTP handler function for the given API resource
-func (rs *RouterService) createHandlerFunc(api artifacts.API, resource artifacts.Resource) http.HandlerFunc {
+func (rs *RouterService) createHandlerFunc(resource artifacts.Resource) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
-		msgContext.Properties["request"] = r.URL.Path
-		msgContext.Properties["method"] = r.Method
-		msgContext.Properties["api"] = api.Name
 
-		// Copy headers
-		for name, values := range r.Header {
-			msgContext.Headers[name] = values[0]
+		// Store the *http.Request in the message context properties.
+		if msgContext.Properties == nil {
+			msgContext.Properties = make(map[string]string)
 		}
-
-		// Read request body
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
-			return
-		}
-		defer r.Body.Close()
-
-		msgContext.Message.RawPayload = body
-		msgContext.Message.ContentType = r.Header.Get("Content-Type")
+		//Store pointer to request as string representation
+		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
 
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
