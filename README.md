@@ -162,25 +162,7 @@ When Synapse starts, it:
 1. Scans the `artifacts/APIs/` directory
 2. Parses each API definition
 3. Automatically registers routes with the HTTP server
-4. Starts the HTTP server on the configured port (default: 8000)
-
-### Customizing the HTTP Server
-
-You can customize the HTTP server port by modifying the environment variable:
-
-```
-export SYNAPSE_HTTP_PORT=9000
-./synapse
-```
-
-Or directly in code using the `NewDeployerWithConfig` function:
-
-```go
-deployer := deployers.NewDeployerWithConfig(deployers.DeployerConfig{
-    BasePath:   "/path/to/artifacts",
-    ListenAddr: ":9000", // Custom port
-}, mediator)
-```
+4. Starts the HTTP server on the configured port (default: 8290)
 
 **Contributing**
 

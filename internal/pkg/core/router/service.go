@@ -28,7 +28,7 @@
 // Usage:
 //
 //	// Create a router service
-//	rs := router.NewRouterService(":8080")
+//	rs := router.NewRouterService(":8290")
 //
 //	// Register an API with the router
 //	rs.RegisterAPI(ctx, myAPI)
@@ -41,6 +41,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
@@ -75,9 +76,31 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	// Store the API
 	rs.apis[api.Name] = api
 
+	// Determine base path based on context and version
+	basePath := api.Context
+
+	// Remove trailing slash from context if present
+	if len(basePath) > 1 && basePath[len(basePath)-1] == '/' {
+		basePath = basePath[:len(basePath)-1]
+	}
+
+	// Handle versioning based on versionType
+	if api.Version != "" && api.VersionType != "" {
+		switch api.VersionType {
+		case "url":
+			// For URL type, add version as a path segment
+			basePath = basePath + "/" + api.Version
+		case "context":
+			// For context type, replace {version} placeholder if it exists
+			versionPattern := "{version}"
+			basePath = strings.Replace(basePath, versionPattern, api.Version, 1)
+		}
+	}
+
 	// Register each resource in the API
 	for _, resource := range api.Resources {
-		pattern := resource.Methods + " " + api.Context + resource.URITemplate
+		// Construct the full pattern: "METHOD /path/to/resource"
+		pattern := resource.Methods + " " + basePath + resource.URITemplate
 		rs.router.HandleFunc(pattern, rs.createHandlerFunc(resource))
 	}
 
