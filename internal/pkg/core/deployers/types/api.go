@@ -93,6 +93,11 @@ func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifact
 		return artifacts.API{}, fmt.Errorf("API context is required")
 	}
 
+	// Check that context starts with '/'
+	if newAPI.Context == "" || newAPI.Context[0] != '/' {
+		return artifacts.API{}, fmt.Errorf("API context must begin with '/' character")
+	}
+
 	if newAPI.Name == "" {
 		return artifacts.API{}, fmt.Errorf("API name is required")
 	}
