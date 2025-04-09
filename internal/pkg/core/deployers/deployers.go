@@ -64,18 +64,6 @@ type Deployer struct {
 //    └─ Inbounds/
 
 func NewDeployer(basePath string, inboundMediator ports.InboundMessageMediator) *Deployer {
-	d := &Deployer{basePath: basePath, inboundMediator: inboundMediator}
-	d.logger = loggerfactory.GetLogger(componentName, d)
-	return d
-}
-
-func (d *Deployer) UpdateLogger() {
-	d.logger = loggerfactory.GetLogger(componentName,d)
-	// Check for environment variable override for HTTP listen address
-	listenAddr := ":8000" // Default port
-	if envPort := os.Getenv("SYNAPSE_HTTP_PORT"); envPort != "" {
-		listenAddr = ":" + envPort
-	}
 	listenAddr := ":8290" // Default port for http connection
 
 	return NewDeployerWithConfig(DeployerConfig{
@@ -84,16 +72,22 @@ func (d *Deployer) UpdateLogger() {
 	}, inboundMediator)
 }
 
+func (d *Deployer) UpdateLogger() {
+	d.logger = loggerfactory.GetLogger(componentName,d)
+}
+
 func NewDeployerWithConfig(config DeployerConfig, inboundMediator ports.InboundMessageMediator) *Deployer {
 	// Create router service with configured listen address
 	routerService := router.NewRouterService(config.ListenAddr)
 
-	return &Deployer{
+	d:= &Deployer{
 		basePath:        config.BasePath,
 		inboundMediator: inboundMediator,
 		routerService:   routerService,
 		config:          config,
 	}
+	d.logger = loggerfactory.GetLogger(componentName, d)	
+	return d
 }
 
 func (d *Deployer) Deploy(ctx context.Context) error {
@@ -161,13 +155,13 @@ func (d *Deployer) DeployAPIs(ctx context.Context, fileName string, xmlData stri
 	configContext := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
 	configContext.AddAPI(newApi)
 
+	d.logger.Info("Deployed API: " + newApi.Name)
+
 	// Register the API with the router service
 	if err := d.routerService.RegisterAPI(ctx, newApi); err != nil {
-		fmt.Printf("Error registering API %s: %v\n", newApi.Name, err)
+		d.logger.Error("Error registering API with router service:", "error", err)
 		return
 	}
-
-	fmt.Println("Deployed API: ", newApi.Name)
 }
 
 func (d *Deployer) DeployInbounds(ctx context.Context, fileName string, xmlData string) {
