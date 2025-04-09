@@ -164,6 +164,55 @@ When Synapse starts, it:
 3. Automatically registers routes with the HTTP server
 4. Starts the HTTP server on the configured port (default: 8290)
 
+### CORS Support
+
+Synapse-go provides built-in CORS (Cross-Origin Resource Sharing) support for APIs. You can configure CORS settings for each API using the `<cors>` element in the API definition.
+
+Example API with CORS configuration:
+
+```xml
+<api context="/api" name="MyAPI">
+    <!-- Configure CORS for this API -->
+    <cors enabled="true"
+          allow-origins="https://example.com,https://app.example.com"
+          allow-methods="GET,POST,PUT,DELETE,PATCH,OPTIONS"
+          allow-headers="Content-Type,Authorization,X-Requested-With,Accept"
+          expose-headers="X-Request-ID,X-Response-Time"
+          allow-credentials="true"
+          max-age="3600" />
+          
+    <!-- API Resources -->
+    <resource methods="GET" uri-template="/hello">
+        <inSequence>
+            <log level="full"/>
+            <!-- Other mediators -->
+        </inSequence>
+        <faultSequence>
+            <!-- Error handling mediators -->
+        </faultSequence>
+    </resource>
+</api>
+```
+
+#### CORS Configuration Options
+
+| Attribute | Description | Default |
+|-----------|-------------|---------|
+| `enabled` | Enable/disable CORS support for this API | `false` |
+| `allow-origins` | Comma-separated list of allowed origins (domains) | `*` (all origins) |
+| `allow-methods` | Comma-separated list of allowed HTTP methods | `GET,POST,PUT,DELETE,OPTIONS,PATCH` |
+| `allow-headers` | Comma-separated list of allowed HTTP headers | `Origin,Content-Type,Accept,Authorization` |
+| `expose-headers` | Comma-separated list of headers to expose to clients | (none) |
+| `allow-credentials` | Whether to allow credentials (cookies, auth) | `false` |
+| `max-age` | Cache duration for preflight responses in seconds | `86400` (24 hours) |
+
+#### CORS Features
+
+- **Automatic OPTIONS Handling**: Synapse automatically creates OPTIONS method handlers for all API resources when CORS is enabled.
+- **Origin Validation**: Requests from unauthorized origins are rejected with a 403 Forbidden response.
+- **Wildcard Support**: You can use `*` to allow all origins, or `*.example.com` to allow all subdomains of example.com.
+- **Preflight Requests**: OPTIONS requests are handled correctly with appropriate CORS headers.
+
 **Contributing**
 
 - Fork the repository
