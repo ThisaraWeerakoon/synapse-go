@@ -152,7 +152,7 @@ func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifact
 				if err != nil {
 					return artifacts.API{}, err
 				}
-				newAPI.Resources = append(api.Resources, res)
+				newAPI.Resources = append(newAPI.Resources, res)
 			default:
 				// Skip unknown elements
 				if err := decoder.Skip(); err != nil {
@@ -199,16 +199,24 @@ func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifact
 func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, position artifacts.Position) (artifacts.Resource, error) {
 	// Extract attributes from the <resource> element
 	res := artifacts.Resource{}
+	var methodsStr string
+
 	for _, attr := range start.Attr {
 		switch attr.Name.Local {
 		case "methods":
-			res.Methods = attr.Value
+			methodsStr = attr.Value
 		case "uri-template":
 			res.URITemplate = attr.Value
 		}
 	}
 
-	// Process child elements
+	// Split the methods string into a slice (e.g., "GET POST PUT" -> ["GET", "POST", "PUT"])
+	if methodsStr != "" {
+		res.Methods = strings.Fields(methodsStr)
+	}
+
+	// Process child elements - use a labeled loop for cleaner exiting
+	parsingLoop:
 	for {
 		token, err := decoder.Token()
 		if err != nil {
@@ -234,8 +242,10 @@ func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, posit
 				}
 			}
 		case xml.EndElement:
-			// Stop when the </resource> tag is encountered
-			break
+            // Stop when the </resource> tag is encountered
+            if elem.Name.Local == "resource" {
+                break parsingLoop
+            }
 		}
 	}
 	return res, nil

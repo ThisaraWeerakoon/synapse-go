@@ -24,7 +24,7 @@ import (
 )
 
 type Resource struct {
-	Methods       string
+	Methods       []string
 	URITemplate   string
 	InSequence    Sequence
 	FaultSequence Sequence
