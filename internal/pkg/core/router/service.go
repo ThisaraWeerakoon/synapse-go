@@ -68,6 +68,45 @@ func NewRouterService(listenAddr string) *RouterService {
 	}
 }
 
+// createHandlerFunc creates an HTTP handler function for the given API resource
+func (rs *RouterService) createHandlerFunc(resource artifacts.Resource, corsConfig artifacts.CORSConfig) http.HandlerFunc {
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		// Create message context
+		msgContext := synctx.CreateMsgContext()
+
+		// Store the *http.Request in the message context properties.
+		if msgContext.Properties == nil {
+			msgContext.Properties = make(map[string]string)
+		}
+		//Store pointer to request as string representation
+		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
+
+		// Process through mediation pipeline
+		success := resource.Mediate(msgContext)
+
+		// Write response
+		if success {
+			for name, value := range msgContext.Headers {
+				w.Header().Set(name, value)
+			}
+			if msgContext.Message.RawPayload != nil {
+				w.Write(msgContext.Message.RawPayload)
+			}
+		} else {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		}
+	}
+
+	// Apply CORS middleware if it's enabled
+	if corsConfig.Enabled {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			CORSMiddleware(http.HandlerFunc(handler), corsConfig).ServeHTTP(w, r)
+		})
+	}
+
+	return handler
+}
+
 // RegisterAPI registers a new API with the router service
 func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) error {
 	rs.mu.Lock()
@@ -97,11 +136,31 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 		}
 	}
 
+	// Log CORS configuration (optional, for debugging)
+	if api.CORSConfig.Enabled {
+		fmt.Printf("CORS enabled for API '%s'\n", api.Name)
+		LogCORSConfig(api.CORSConfig)
+	}
+
 	// Register each resource in the API
 	for _, resource := range api.Resources {
 		// Construct the full pattern: "METHOD /path/to/resource"
 		pattern := resource.Methods + " " + basePath + resource.URITemplate
-		rs.router.HandleFunc(pattern, rs.createHandlerFunc(resource))
+
+		// Extract method names for OPTIONS handler
+		methods := strings.Split(resource.Methods, ",")
+		for i := range methods {
+			methods[i] = strings.TrimSpace(methods[i])
+		}
+
+		// Register the handler for the resource pattern
+		rs.router.HandleFunc(pattern, rs.createHandlerFunc(resource, api.CORSConfig))
+
+		// If CORS is enabled, register an OPTIONS handler for this resource
+		if api.CORSConfig.Enabled {
+			optionsPattern := "OPTIONS " + basePath + resource.URITemplate
+			rs.router.HandleFunc(optionsPattern, CreateOptionsHandler(methods, api.CORSConfig))
+		}
 	}
 
 	// Start the server if it hasn't been started yet
@@ -112,36 +171,6 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	}
 
 	return nil
-}
-
-// createHandlerFunc creates an HTTP handler function for the given API resource
-func (rs *RouterService) createHandlerFunc(resource artifacts.Resource) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Create message context
-		msgContext := synctx.CreateMsgContext()
-
-		// Store the *http.Request in the message context properties.
-		if msgContext.Properties == nil {
-			msgContext.Properties = make(map[string]string)
-		}
-		//Store pointer to request as string representation
-		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
-
-		// Process through mediation pipeline
-		success := resource.Mediate(msgContext)
-
-		// Write response
-		if success {
-			for name, value := range msgContext.Headers {
-				w.Header().Set(name, value)
-			}
-			if msgContext.Message.RawPayload != nil {
-				w.Write(msgContext.Message.RawPayload)
-			}
-		} else {
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-	}
 }
 
 // startServer starts the HTTP server
