@@ -31,18 +31,19 @@ type Resource struct {
 }
 
 type API struct {
-	Context       string
-	Name          string
-	Version       string
-	VersionType   string
-	Resources     []Resource
-	Position      Position
+	Context     string
+	Name        string
+	Version     string
+	VersionType string
+	Resources   []Resource
+	Position    Position
+	CORSConfig  CORSConfig
 }
 
 func (r *Resource) Mediate(context *synctx.MsgContext) bool {
 	isSuccessInSeq := r.InSequence.Execute(context)
 	if !isSuccessInSeq {
-		isCompleteFaultSeq:= r.FaultSequence.Execute(context)
+		isCompleteFaultSeq := r.FaultSequence.Execute(context)
 		if !isCompleteFaultSeq {
 			return false
 		}
