@@ -46,6 +46,25 @@ func (m *MockMediator) Execute(context *synctx.MsgContext) (bool, error) {
 	return true, nil
 }
 
+// TestMethodMediator implements the Mediator interface for method testing
+type TestMethodMediator struct {
+	executed bool
+	method   string
+}
+
+func (m *TestMethodMediator) Execute(context *synctx.MsgContext) (bool, error) {
+	m.executed = true
+	// Store the HTTP method used for verification
+	if context.Properties["http_request"] != "" {
+		r := context.Properties["http_request"]
+		m.method = r // simplified for test
+	}
+	// Set a test response
+	context.Message.RawPayload = []byte("Test response for " + m.method)
+	context.Headers["Content-Type"] = "text/plain"
+	return true, nil
+}
+
 func TestRouterService_RegisterAPI(t *testing.T) {
 	// Create a test server that will never start listening
 	rs := &RouterService{
@@ -61,7 +80,7 @@ func TestRouterService_RegisterAPI(t *testing.T) {
 		Context: "/test",
 		Resources: []artifacts.Resource{
 			{
-				Methods:     "GET",
+				Methods:     []string{"GET"},
 				URITemplate: "/resource",
 				InSequence: artifacts.Sequence{
 					MediatorList: []artifacts.Mediator{mediator},
@@ -154,7 +173,7 @@ func TestRegisterAPI_Versioning(t *testing.T) {
 				VersionType: tc.versionType,
 				Resources: []artifacts.Resource{
 					{
-						Methods:     "GET",
+						Methods:     []string{"GET"},
 						URITemplate: tc.uriTemplate,
 					},
 				},
@@ -208,4 +227,158 @@ func calcExpectedPath(context, version, versionType, uriTemplate string) string 
 
 	// Construct the full pattern
 	return "GET " + basePath + uriTemplate
+}
+
+func TestRouterService_MultipleMethodsPerResource(t *testing.T) {
+	// Create a test server that will never start listening
+	rs := &RouterService{
+		router:     http.NewServeMux(),
+		apis:       make(map[string]artifacts.API),
+		listenAddr: "test-only",
+		started:    true, // Prevent actual server start
+	}
+
+	// Create a mock API with a resource that supports multiple methods
+	mediator := &MockMediator{}
+	api := artifacts.API{
+		Name:    "MultiMethodAPI",
+		Context: "/api",
+		Resources: []artifacts.Resource{
+			{
+				Methods:     []string{"GET", "POST", "PUT", "DELETE"},
+				URITemplate: "/resource",
+				InSequence: artifacts.Sequence{
+					MediatorList: []artifacts.Mediator{mediator},
+				},
+			},
+		},
+	}
+
+	// Register the API
+	ctx := context.Background()
+	if err := rs.RegisterAPI(ctx, api); err != nil {
+		t.Fatalf("Failed to register API: %v", err)
+	}
+
+	// Get registered routes
+	routes := rs.GetRegisteredRoutes("MultiMethodAPI")
+
+	// Check that we have the correct number of routes
+	expectedRoutes := []string{
+		"GET /api/resource",
+		"POST /api/resource",
+		"PUT /api/resource",
+		"DELETE /api/resource",
+	}
+
+	if len(routes) != len(expectedRoutes) {
+		t.Errorf("Expected %d routes, got %d", len(expectedRoutes), len(routes))
+	}
+
+	// Check that all expected routes are registered
+	for _, expected := range expectedRoutes {
+		found := false
+		for _, actual := range routes {
+			if expected == actual {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("Expected route %s not found in registered routes", expected)
+		}
+	}
+
+	// Test that each method actually works by sending requests
+	for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
+		// Reset the mediator state
+		mediator.executed = false
+
+		// Create a test request with the appropriate method
+		req := httptest.NewRequest(method, "/api/resource", nil)
+		w := httptest.NewRecorder()
+
+		// Serve the request
+		rs.router.ServeHTTP(w, req)
+
+		// Check the response
+		resp := w.Result()
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("Expected status OK for %s, got %v", method, resp.StatusCode)
+		}
+
+		if !mediator.executed {
+			t.Errorf("Mediator was not executed for %s request", method)
+		}
+	}
+}
+
+func TestRouterService_MultipleHTTPMethods(t *testing.T) {
+	// Create a test server that will never start listening
+	rs := &RouterService{
+		router:     http.NewServeMux(),
+		apis:       make(map[string]artifacts.API),
+		listenAddr: "test-only",
+		started:    true, // Prevent actual server start
+	}
+
+	// Create a mock API with resources that have multiple methods
+	mediator := &TestMethodMediator{}
+	api := artifacts.API{
+		Name:    "MultiMethodAPI",
+		Context: "/api",
+		Resources: []artifacts.Resource{
+			{
+				Methods:     []string{"GET", "POST", "PUT", "DELETE"},
+				URITemplate: "/resource",
+				InSequence: artifacts.Sequence{
+					MediatorList: []artifacts.Mediator{mediator},
+				},
+			},
+		},
+	}
+
+	// Register the API
+	ctx := context.Background()
+	if err := rs.RegisterAPI(ctx, api); err != nil {
+		t.Fatalf("Failed to register API: %v", err)
+	}
+
+	// Get registered routes
+	routes := rs.GetRegisteredRoutes("MultiMethodAPI")
+
+	// Check that we have the correct number of routes
+	if len(routes) != 4 {
+		t.Errorf("Expected 4 routes, got %d", len(routes))
+	}
+
+	// Test each HTTP method
+	for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
+		t.Run(method, func(t *testing.T) {
+			// Reset mediator
+			mediator.executed = false
+			mediator.method = ""
+
+			// Create request with specific method
+			req := httptest.NewRequest(method, "/api/resource", nil)
+			w := httptest.NewRecorder()
+
+			// Serve the request
+			rs.router.ServeHTTP(w, req)
+
+			// Verify the response
+			resp := w.Result()
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Errorf("Expected status OK for %s, got %v", method, resp.StatusCode)
+			}
+
+			if !mediator.executed {
+				t.Errorf("Mediator was not executed for %s request", method)
+			}
+		})
+	}
 }

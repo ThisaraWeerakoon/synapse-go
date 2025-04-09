@@ -199,13 +199,20 @@ func (api *API) Unmarshal(xmlData string, position artifacts.Position) (artifact
 func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, position artifacts.Position) (artifacts.Resource, error) {
 	// Extract attributes from the <resource> element
 	res := artifacts.Resource{}
+	var methodsStr string
+
 	for _, attr := range start.Attr {
 		switch attr.Name.Local {
 		case "methods":
-			res.Methods = attr.Value
+			methodsStr = attr.Value
 		case "uri-template":
 			res.URITemplate = attr.Value
 		}
+	}
+
+	// Split the methods string into a slice (e.g., "GET POST PUT" -> ["GET", "POST", "PUT"])
+	if methodsStr != "" {
+		res.Methods = strings.Fields(methodsStr)
 	}
 
 	// Process child elements

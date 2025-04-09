@@ -35,8 +35,3 @@ type InboundEndpoint interface {
 type InboundMessageMediator interface {
 	MediateInboundMessage(ctx context.Context, seqName string, msg *synctx.MsgContext) error
 }
-
-// Primary/Driving Port
-type APIMessageMediator interface{
-	MediateAPIMessage(ctx context.Context, msg *synctx.MsgContext) error
-}
