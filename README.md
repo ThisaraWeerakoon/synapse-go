@@ -213,6 +213,50 @@ Example API with CORS configuration:
 - **Wildcard Support**: You can use `*` to allow all origins, or `*.example.com` to allow all subdomains of example.com.
 - **Preflight Requests**: OPTIONS requests are handled correctly with appropriate CORS headers.
 
+### Swagger Documentation
+
+Synapse-go provides built-in Swagger/OpenAPI documentation for your APIs. The documentation is automatically generated from your API definitions and accessible through special URLs.
+
+#### Accessing Swagger Documentation
+
+For any API named `<API_NAME>`, you can access its Swagger documentation at:
+
+- **YAML Format**: `http://localhost:8290/<API_NAME>?swagger.yaml`
+  - Example: `http://localhost:8290/FoodAPI?swagger.yaml`
+
+- **JSON Format**: `http://localhost:8290/<API_NAME>?swagger.json`
+  - Example: `http://localhost:8290/FoodAPI?swagger.json`
+
+- **HTML UI**: `http://localhost:8290/<API_NAME>?swagger.html`
+  - Example: `http://localhost:8290/FoodAPI?swagger.html`
+
+If your API has a version specified (e.g., `version="1.0"` in the API definition), the documentation URLs include the version:
+
+- `http://localhost:8290/<API_NAME>/<API_VERSION>?swagger.yaml`
+- `http://localhost:8290/<API_NAME>/<API_VERSION>?swagger.json`
+- `http://localhost:8290/<API_NAME>/<API_VERSION>?swagger.html`
+
+#### Generated Documentation Includes
+
+The automatically generated Swagger documentation includes:
+
+- API basic information (name, description, version)
+- All endpoints (resources) defined in the API
+- HTTP methods supported by each endpoint
+- Path parameters extracted from URI templates
+- Response definitions
+
+#### Swagger UI
+
+The HTML documentation URL (`?swagger.html`) provides an interactive Swagger UI interface where you can:
+
+- Browse all API endpoints
+- Expand operations to see details
+- View request/response schemas
+- Test API endpoints directly from the browser
+
+This makes it easy to share API documentation with developers or test your APIs without additional tools.
+
 **Contributing**
 
 - Fork the repository

@@ -33,6 +33,7 @@ import (
 	"github.com/apache/synapse-go/internal/pkg/config"
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/deployers"
+	"github.com/apache/synapse-go/internal/pkg/core/router"
 	"github.com/apache/synapse-go/internal/pkg/core/utils"
 )
 
@@ -66,13 +67,18 @@ func Run(ctx context.Context) error {
 	}
 
 	mediationEngine := mediation.NewMediationEngine()
+
+	// Initialize the router service
+	listenAddr := ":8290" // Default port for http connection
+	routerService := router.NewRouterService(listenAddr)
+
 	artifactsPath := filepath.Join(binDir, "..", "artifacts")
-	deployer := deployers.NewDeployer(artifactsPath, mediationEngine)
+	deployer := deployers.NewDeployer(artifactsPath, mediationEngine, routerService)
 	err = deployer.Deploy(ctx)
 	if err != nil {
 		log.Printf("Error deploying artifacts: %v", err)
 	}
-
+	
 	elapsed := time.Since(start)
 	log.Printf("Server started in: %v", elapsed)
 

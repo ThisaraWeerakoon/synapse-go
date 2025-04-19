@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<api name="HealthcareAPI" context="/healthcare/{version}/services" version="2.0" version-type="context" xmlns="http://ws.apache.org/ns/synapse">
+    <cors enabled="true"
+        allow-origins="https://example.com,https://app.example.com"
+        allow-methods="GET,POST,PUT,DELETE,PATCH,OPTIONS"
+        allow-headers="Content-Type,Authorization,X-Requested-With,Accept"
+        expose-headers="X-Request-ID,X-Response-Time"
+        allow-credentials="true"
+        max-age="3600" />
+    <resource methods="GET" uri-template="/querydoctor_2/{category}">
+        <inSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message>message from healthcare api (version 2) get querydoctor resource</message>
+                <property name="Log Property message" value="&quot;Welcome to HealthcareService&quot;"/>
+            </log>
+        </inSequence>
+        <faultSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message></message>
+                <property name="false message" value="&quot;Fault Sequence&quot;"/>
+            </log>
+        </faultSequence>
+    </resource>
+        <resource methods="POST GET PATCH" uri-template="/changedoctor_2/{category}">
+        <inSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message>message from healthcare api (version 2) post get patch changedoctor resource</message>
+                <property name="Log Property message" value="&quot;Welcome to HealthcareService&quot;"/>
+            </log>
+        </inSequence>
+        <faultSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message></message>
+                <property name="false message" value="&quot;Fault Sequence&quot;"/>
+            </log>
+        </faultSequence>
+    </resource>
+</api>
