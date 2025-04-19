@@ -2,7 +2,10 @@ module github.com/apache/synapse-go
 
 go 1.23.0
 
-require github.com/stretchr/testify v1.10.0
+require (
+	github.com/rs/cors v1.11.1
+	github.com/stretchr/testify v1.10.0
+)
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -10,7 +13,6 @@ require (
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/rs/cors v1.11.1 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 )
 
@@ -21,5 +23,6 @@ require (
 	github.com/knadh/koanf/providers/file v1.1.2
 	github.com/knadh/koanf/v2 v2.1.2
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

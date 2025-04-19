@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<api name="FoodAPI" context="/food/services" xmlns="http://ws.apache.org/ns/synapse">
+    <cors enabled="true"
+        allow-origins="https://example.com,https://app.example.com"
+        allow-methods="GET,POST,PUT,DELETE,PATCH,OPTIONS"
+        allow-headers="Content-Type,Authorization,X-Requested-With,Accept"
+        expose-headers="X-Request-ID,X-Response-Time"
+        allow-credentials="true"
+        max-age="3600" />
+    <resource methods="GET" uri-template="/order/{category}">
+        <inSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message>message from api get resource</message>
+                <property name="Log Property message" value="&quot;Welcome to HealthcareService&quot;"/>
+            </log>
+        </inSequence>
+        <faultSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message></message>
+                <property name="false message" value="&quot;Fault Sequence&quot;"/>
+            </log>
+        </faultSequence>
+    </resource>
+    <resource methods="POST" uri-template="/payfood/{category}">
+        <inSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message>message from food api post resource</message>
+                <property name="Log Property message" value="&quot;Welcome to HealthcareService&quot;"/>
+            </log>
+        </inSequence>
+        <faultSequence>
+            <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
+                <message></message>
+                <property name="false message" value="&quot;Fault Sequence&quot;"/>
+            </log>
+        </faultSequence>
+    </resource>
+</api>

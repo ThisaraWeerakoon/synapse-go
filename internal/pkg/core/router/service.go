@@ -44,8 +44,11 @@ import (
 	"strings"
 	"sync"
 
+	"encoding/json"
+
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
+	"gopkg.in/yaml.v2"
 )
 
 // RouterService manages API routing and server lifecycle
@@ -97,6 +100,29 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 		}
 	}
 
+	// Register swagger documentation handlers with appropriate versioning in URL
+	// If version is not empty, register at /<API_NAME>/<API_VERSION>
+	// If version is empty, register at /<API_NAME>
+	swaggerBasePath := "/" + api.Name
+	if api.Version != "" {
+		swaggerBasePath = swaggerBasePath + "/" + api.Version
+	}
+
+	rs.router.HandleFunc(swaggerBasePath, func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if query.Has("swagger.yaml") {
+			rs.serveSwaggerYAML(w, r, api)
+			return
+		} else if query.Has("swagger.json") {
+			rs.serveSwaggerJSON(w, r, api)
+			return
+		} else if query.Has("swagger.html") {
+			rs.serveSwaggerHTML(w, r, api)
+			return
+		}
+		http.NotFound(w, r)
+	})
+
 	// Create a subrouter for this API
 	apiHandler := http.NewServeMux()
 
@@ -120,7 +146,7 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	}
 
 	// Register the API handler with the main router
-	rs.router.Handle(basePath + "/", http.StripPrefix(basePath, handler))
+	rs.router.Handle(basePath+"/", http.StripPrefix(basePath, handler))
 
 	// Start the server if it hasn't been started yet
 	if !rs.started {
@@ -246,4 +272,202 @@ func (rs *RouterService) GetRegisteredRoutes(apiName string) []string {
 	}
 
 	return routes
+}
+
+// serveSwaggerYAML serves the swagger.yaml documentation for the API
+func (rs *RouterService) serveSwaggerYAML(w http.ResponseWriter, r *http.Request, api artifacts.API) {
+	swagger := rs.generateSwaggerDoc(api)
+	yamlData, err := yaml.Marshal(swagger)
+	if err != nil {
+		http.Error(w, "Failed to generate YAML", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/yaml")
+	w.Write(yamlData)
+}
+
+// serveSwaggerJSON serves the swagger.json documentation for the API
+func (rs *RouterService) serveSwaggerJSON(w http.ResponseWriter, r *http.Request, api artifacts.API) {
+	swagger := rs.generateSwaggerDoc(api)
+	jsonData, err := json.MarshalIndent(swagger, "", "  ")
+	if err != nil {
+		http.Error(w, "Failed to generate JSON", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
+}
+
+// serveSwaggerHTML serves the swagger.html documentation for the API
+func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, r *http.Request, api artifacts.API) {
+	// HTML template for Swagger UI
+	htmlTemplate := `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Swagger UI - %s</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui.css" />
+  <script src="https://unpkg.com/swagger-ui-dist@4.5.0/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <style>
+    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body { margin: 0; background: #fafafa; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script>
+    window.onload = function() {
+      SwaggerUIBundle({
+        url: "%s?swagger.json",
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout"
+      });
+    }
+  </script>
+</body>
+</html>`
+
+	var swaggerJsonUrl string
+	if api.Version != "" {
+		swaggerJsonUrl = fmt.Sprintf("/%s/%s", api.Name, api.Version)
+	} else {
+		swaggerJsonUrl = fmt.Sprintf("/%s", api.Name)
+	}
+
+	htmlContent := fmt.Sprintf(htmlTemplate, api.Name, swaggerJsonUrl)
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(htmlContent))
+}
+
+// generateSwaggerDoc creates a swagger/OpenAPI representation of the API
+func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interface{} {
+	// Determine base path based on context and version
+	basePath := api.Context
+	if len(basePath) > 1 && basePath[len(basePath)-1] == '/' {
+		basePath = basePath[:len(basePath)-1]
+	}
+
+	// Handle versioning based on versionType
+	if api.Version != "" && api.VersionType != "" {
+		switch api.VersionType {
+		case "url":
+			basePath = basePath + "/" + api.Version
+		case "context":
+			versionPattern := "{version}"
+			basePath = strings.Replace(basePath, versionPattern, api.Version, 1)
+		}
+	}
+
+	// Create basic swagger document
+	swagger := map[string]interface{}{
+		"openapi": "3.0.3",
+		"info": map[string]interface{}{
+			"title":       api.Name,
+			"description": "API automatically generated from Synapse API definition",
+			"version":     api.Version,
+		},
+		"servers": []map[string]interface{}{
+			{
+				"url": basePath,
+			},
+		},
+		"paths": map[string]interface{}{},
+	}
+
+	paths := swagger["paths"].(map[string]interface{})
+
+	// Add paths and methods from API resources
+	for _, resource := range api.Resources {
+		pathItem := map[string]interface{}{}
+
+		for _, method := range resource.Methods {
+			methodLower := strings.ToLower(method)
+
+			// Skip OPTIONS method as it's handled by CORS
+			if methodLower == "options" {
+				continue
+			}
+
+			operation := map[string]interface{}{
+				"summary":     fmt.Sprintf("%s %s", method, resource.URITemplate),
+				"description": fmt.Sprintf("Operation for %s %s", method, resource.URITemplate),
+				"operationId": fmt.Sprintf("%s_%s", methodLower, strings.ReplaceAll(strings.Trim(resource.URITemplate, "/"), "/", "_")),
+				"responses": map[string]interface{}{
+					"200": map[string]interface{}{
+						"description": "Successful operation",
+					},
+					"500": map[string]interface{}{
+						"description": "Internal server error",
+					},
+				},
+			}
+
+			// Extract path parameters
+			params := rs.extractPathParams(resource.URITemplate)
+			if len(params) > 0 {
+				paramDefs := []map[string]interface{}{}
+				for _, param := range params {
+					paramDefs = append(paramDefs, map[string]interface{}{
+						"name":        param,
+						"in":          "path",
+						"required":    true,
+						"description": fmt.Sprintf("Parameter %s", param),
+						"schema": map[string]interface{}{
+							"type": "string",
+						},
+					})
+				}
+				operation["parameters"] = paramDefs
+			}
+
+			pathItem[methodLower] = operation
+		}
+
+		paths[resource.URITemplate] = pathItem
+	}
+
+	// Add components section with security schemes if needed
+	if api.CORSConfig.Enabled {
+		// Check if there's any security related headers in CORS config
+		for _, header := range api.CORSConfig.AllowHeaders {
+			if strings.ToLower(header) == "authorization" {
+				swagger["components"] = map[string]interface{}{
+					"securitySchemes": map[string]interface{}{
+						"bearerAuth": map[string]interface{}{
+							"type":         "http",
+							"scheme":       "bearer",
+							"bearerFormat": "JWT",
+						},
+					},
+				}
+				break
+			}
+		}
+	}
+
+	return swagger
+}
+
+// extractPathParams extracts path parameters from a URI template
+func (rs *RouterService) extractPathParams(uriTemplate string) []string {
+	params := []string{}
+	segments := strings.Split(uriTemplate, "/")
+
+	for _, segment := range segments {
+		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
+			// Extract parameter name without braces
+			paramName := segment[1 : len(segment)-1]
+			params = append(params, paramName)
+		}
+	}
+
+	return params
 }
