@@ -24,13 +24,13 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"sync"
+	// "sync"
 	"time"
 
 	"github.com/apache/synapse-go/internal/app/core/domain"
 	"github.com/apache/synapse-go/internal/app/core/ports"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
-	"github.com/apache/synapse-go/internal/pkg/core/utils"
+	// "github.com/apache/synapse-go/internal/pkg/core/utils"
 )
 
 type FileInboundEndpoint struct {
@@ -50,7 +50,7 @@ func NewFileInboundEndpoint(
 
 func (inbound *FileInboundEndpoint) Start(ctx context.Context, mediator ports.InboundMessageMediator) error {
 	inbound.IsRunning = true
-	waitgroup := ctx.Value(utils.WaitGroupKey).(*sync.WaitGroup)
+	// waitgroup := ctx.Value(utils.WaitGroupKey).(*sync.WaitGroup)
 	if inbound.Config.Protocol == "file" {
 		var fileContent = "Hello World"
 		interval, found := inbound.getIntervalParameterValue()
@@ -64,12 +64,12 @@ func (inbound *FileInboundEndpoint) Start(ctx context.Context, mediator ports.In
 		for {
 			if !inbound.IsRunning {
 				fmt.Println("Cleaning up file polling")
-				waitgroup.Done()
+				// waitgroup.Done()
 			}
 			select {
 			case <-ctx.Done():
 				fmt.Println("Cleaning up file polling gracefully")
-				waitgroup.Done()
+				// waitgroup.Done()
 				return nil
 			default:
 				fmt.Println("Polling file")

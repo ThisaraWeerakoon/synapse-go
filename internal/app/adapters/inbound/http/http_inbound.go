@@ -45,6 +45,7 @@ func NewHTTPInboundEndpoint(
 ) *HTTPInboundEndpoint {
 	return &HTTPInboundEndpoint{
 		config: config,
+		router: http.NewServeMux(),
 	}
 }
 
@@ -58,9 +59,10 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 		// Context still valid, proceed with normal operation
 	}
 
-	h.mediator = mediator
 	h.IsRunning = true
+	h.mediator = mediator
 
+	// Set up the HTTP handler for the root path
 	h.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
@@ -78,7 +80,6 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 	})
 
 	port := h.config.Parameters["inbound.http.port"]
-	fmt.Printf("Server starting on port %s...\n", port)
 
 	// Ensure the port has the proper format with colon prefix
 	listenAddr := ":" + port
@@ -110,9 +111,7 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 			fmt.Println("HTTP server stopped gracefully")
 		}
 	}()
-
 	return nil
-
 }
 
 // call this using a channel
