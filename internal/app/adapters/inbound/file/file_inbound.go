@@ -17,7 +17,7 @@
  *  under the License.
  */
 
-package inbound
+package file
 
 import (
 	"context"
@@ -36,6 +36,16 @@ import (
 type FileInboundEndpoint struct {
 	Config    domain.InboundConfig
 	IsRunning bool
+}
+
+// NewFileInboundEndpoint creates a new FileInboundEndpoint instance
+func NewFileInboundEndpoint(
+	config domain.InboundConfig,
+	mediator ports.InboundMessageMediator,
+) *FileInboundEndpoint {
+	return &FileInboundEndpoint{
+		Config:   config,
+	}
 }
 
 func (inbound *FileInboundEndpoint) Start(ctx context.Context, mediator ports.InboundMessageMediator) error {
