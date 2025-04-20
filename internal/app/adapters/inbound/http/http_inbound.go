@@ -31,9 +31,9 @@ import (
 
 // FileInboundEndpoint handles file-based inbound operations
 type HTTPInboundEndpoint struct {
-	config          domain.InboundConfig
-	mediator        ports.InboundMessageMediator
-	IsRunning       bool
+	config    domain.InboundConfig
+	mediator  ports.InboundMessageMediator
+	IsRunning bool
 }
 
 // NewHTTPInboundEndpoint creates a new HTTPInboundEndpoint instance
@@ -42,7 +42,7 @@ func NewHTTPInboundEndpoint(
 	mediator ports.InboundMessageMediator,
 ) *HTTPInboundEndpoint {
 	return &HTTPInboundEndpoint{
-		config:   config,
+		config: config,
 	}
 }
 
@@ -75,7 +75,12 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 	})
 	port := h.config.Parameters["inbound.http.port"]
 	fmt.Printf("Server starting on port %s...\n", port)
-	err := http.ListenAndServe(port, nil)
+	// Ensure the port has the proper format with colon prefix
+	listenAddr := ":" + port
+	if port[0] == ':' {
+		listenAddr = port // Port already has colon prefix
+	}
+	err := http.ListenAndServe(listenAddr, nil)
 	if err != nil {
 		fmt.Println("Error starting server:", err)
 		return err
@@ -89,4 +94,3 @@ func (adapter *HTTPInboundEndpoint) Stop() error {
 	adapter.IsRunning = false
 	return nil
 }
-
