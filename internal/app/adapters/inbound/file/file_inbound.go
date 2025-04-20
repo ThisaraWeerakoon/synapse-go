@@ -44,7 +44,7 @@ func NewFileInboundEndpoint(
 	mediator ports.InboundMessageMediator,
 ) *FileInboundEndpoint {
 	return &FileInboundEndpoint{
-		Config:   config,
+		Config: config,
 	}
 }
 

@@ -23,7 +23,6 @@ import (
 	"context"
 	"log/slog"
 	"sync"
-	
 
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"

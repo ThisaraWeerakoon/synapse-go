@@ -40,11 +40,10 @@ const (
 	componentName = "deployers"
 )
 
-
 type Deployer struct {
 	inboundMediator ports.InboundMessageMediator
 	basePath        string
-	logger 			*slog.Logger
+	logger          *slog.Logger
 }
 
 // Synapse/
@@ -63,7 +62,7 @@ func NewDeployer(basePath string, inboundMediator ports.InboundMessageMediator) 
 }
 
 func (d *Deployer) UpdateLogger() {
-	d.logger = loggerfactory.GetLogger(componentName,d)
+	d.logger = loggerfactory.GetLogger(componentName, d)
 }
 
 func (d *Deployer) Deploy(ctx context.Context) error {

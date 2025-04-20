@@ -34,6 +34,8 @@ type HTTPInboundEndpoint struct {
 	config    domain.InboundConfig
 	mediator  ports.InboundMessageMediator
 	IsRunning bool
+	server    *http.Server
+	router    *http.ServeMux
 }
 
 // NewHTTPInboundEndpoint creates a new HTTPInboundEndpoint instance
@@ -58,7 +60,8 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 
 	h.mediator = mediator
 	h.IsRunning = true
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+	h.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
 
@@ -69,22 +72,45 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 		//Store pointer to request as string representation
 		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
 
+		// Mediate the inbound message
+		// Call the mediator to process the message
 		h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext)
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Message received"))
 	})
+
 	port := h.config.Parameters["inbound.http.port"]
 	fmt.Printf("Server starting on port %s...\n", port)
+
 	// Ensure the port has the proper format with colon prefix
 	listenAddr := ":" + port
 	if port[0] == ':' {
 		listenAddr = port // Port already has colon prefix
 	}
-	err := http.ListenAndServe(listenAddr, nil)
-	if err != nil {
-		fmt.Println("Error starting server:", err)
-		return err
+
+	// Create a new HTTP server
+	h.server = &http.Server{
+		Addr:    listenAddr,
+		Handler: h.router,
 	}
+
+	// Start the server in a goroutine
+	go func() {
+		fmt.Printf("Starting HTTP server on %s\n", listenAddr)
+		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("HTTP server error: %v\n", err)
+		}
+	}()
+
+	// Start a goroutine to monitor context cancellation and shut down server
+	go func() {
+		<-ctx.Done()
+		fmt.Println("Shutting down HTTP server...")
+		if err := h.server.Shutdown(ctx); err != nil {
+			fmt.Printf("Error shutting down HTTP server: %v\n", err)
+		} else {
+			fmt.Println("HTTP server stopped gracefully")
+		}
+	}()
+
 	return nil
 
 }
