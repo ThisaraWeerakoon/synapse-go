@@ -24,17 +24,6 @@
 // - HTTP server lifecycle management with automatic start/stop
 // - Request handling with conversion to/from Synapse message contexts
 // - Method-based routing for RESTful APIs
-//
-// Usage:
-//
-//	// Create a router service
-//	rs := router.NewRouterService(":8290")
-//
-//	// Register an API with the router
-//	rs.RegisterAPI(ctx, myAPI)
-//
-//	// Later, gracefully shut down
-//	rs.Shutdown(ctx)
 
 package router
 
@@ -135,7 +124,9 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 			// Construct the full pattern: "METHOD /path/to/resource"
 			pattern := method + " " + resource.URITemplate
 			apiHandler.HandleFunc(pattern, rs.createResourceHandler(resource))
-			rs.logger.Info("Registered route for API: '%s': %s", slog.String("api_name", api.Name), slog.String("pattern", pattern))
+			rs.logger.Info("Registered route for API",
+				slog.String("api_name", api.Name),
+				slog.String("pattern", pattern))
 			// No need to register explicit OPTIONS handlers when using rs/cors package
 			// The CORSMiddleware already handles OPTIONS preflight requests automatically
 		}
@@ -204,8 +195,6 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 		rs.logger.Info("Shutting down HTTP server...")
 		if err := rs.server.Shutdown(ctx); err != nil {
 			rs.logger.Error("Error shutting down HTTP server", slog.String("error", err.Error()))
-		} else {
-			rs.logger.Info("HTTP server stopped gracefully")
 		}
 	}()
 	return nil
