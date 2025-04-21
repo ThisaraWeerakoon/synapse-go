@@ -78,6 +78,9 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		log.Printf("Error deploying artifacts: %v", err)
 	}
+
+	// Start HTTP Server
+	routerService.StartServer(ctx)
 	
 	elapsed := time.Since(start)
 	log.Printf("Server started in: %v", elapsed)

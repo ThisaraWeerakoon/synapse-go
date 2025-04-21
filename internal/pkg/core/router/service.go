@@ -33,6 +33,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"encoding/json"
 
@@ -56,7 +57,7 @@ type RouterService struct {
 
 // NewRouterService creates a new router service with the given listen address
 func NewRouterService(listenAddr string) *RouterService {
-	rs:= &RouterService{
+	rs := &RouterService{
 		router:     http.NewServeMux(),
 		listenAddr: listenAddr,
 	}
@@ -149,12 +150,18 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
 
-		// Store the *http.Request in the message context properties.
-		if msgContext.Properties == nil {
-			msgContext.Properties = make(map[string]string)
+		// Set request into message context properties
+		msgContext.Properties["http_request"] = r
+
+		// Set path parameters into message context properties
+		pathParamsMap := make(map[string]string)
+		for _, pathParam := range rs.extractPathParams(resource.URITemplate) {
+			pathParamsMap[pathParam] = r.PathValue(pathParam)
 		}
-		//Store pointer to request as string representation
-		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
+		msgContext.Properties["path_params"] = pathParamsMap
+
+		// Set query parameters into message context properties
+		msgContext.Properties["query_params"] = r.URL.Query()
 
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
@@ -181,9 +188,13 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 		Handler: rs.router,
 	}
 
+	// Register health/liveness endpoints
+	rs.registerLivelinessEndpoint()
+	rs.logger.Info("liveness endpoint registered")
+
 	// Start the server in a goroutine
 	go func() {
-		rs.logger.Info("Starting HTTP server", slog.String("address", rs.listenAddr))	
+		rs.logger.Info("Starting HTTP server", slog.String("address", rs.listenAddr))
 		if err := rs.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			rs.logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
@@ -193,6 +204,7 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		rs.logger.Info("Shutting down HTTP server...")
+		// Shutdown the server gracefully
 		if err := rs.server.Shutdown(ctx); err != nil {
 			rs.logger.Error("Error shutting down HTTP server", slog.String("error", err.Error()))
 		}
@@ -200,6 +212,18 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 	return nil
 }
 
+// registerHealthEndpoints registers health and liveness endpoints
+func (rs *RouterService) registerLivelinessEndpoint() {
+	// liveliness probe endpoint
+	rs.router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":    "UP",
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+	})
+}
 
 // serveSwaggerYAML serves the swagger.yaml documentation for the API
 func (rs *RouterService) serveSwaggerYAML(w http.ResponseWriter, api artifacts.API) {
@@ -360,26 +384,6 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 
 		paths[resource.URITemplate] = pathItem
 	}
-
-	// Add components section with security schemes if needed
-	if api.CORSConfig.Enabled {
-		// Check if there's any security related headers in CORS config
-		for _, header := range api.CORSConfig.AllowHeaders {
-			if strings.ToLower(header) == "authorization" {
-				swagger["components"] = map[string]interface{}{
-					"securitySchemes": map[string]interface{}{
-						"bearerAuth": map[string]interface{}{
-							"type":         "http",
-							"scheme":       "bearer",
-							"bearerFormat": "JWT",
-						},
-					},
-				}
-				break
-			}
-		}
-	}
-
 	return swagger
 }
 
