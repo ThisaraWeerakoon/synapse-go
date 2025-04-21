@@ -156,6 +156,11 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		//Store pointer to request as string representation
 		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
 
+		// Set path variables and corresponding values into message context properties
+		for _,pathParam := range(rs.extractPathParams(resource.URITemplate)){
+			msgContext.Properties[pathParam] = r.PathValue(pathParam)
+		}
+
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
 
@@ -166,6 +171,9 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 			}
 			if msgContext.Message.RawPayload != nil {
 				w.Write(msgContext.Message.RawPayload)
+			}
+			for name, value := range msgContext.Properties {
+				w.Header().Set(name, value)
 			}
 		} else {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
