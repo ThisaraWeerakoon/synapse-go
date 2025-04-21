@@ -35,20 +35,26 @@
 //
 //	// Later, gracefully shut down
 //	rs.Shutdown(ctx)
+
 package router
 
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 
 	"encoding/json"
 
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
+	"github.com/apache/synapse-go/internal/pkg/loggerfactory"
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	componentName = "router"
 )
 
 // RouterService manages API routing and server lifecycle
@@ -56,24 +62,25 @@ type RouterService struct {
 	server     *http.Server
 	router     *http.ServeMux
 	listenAddr string
-	mu         sync.RWMutex
-	started    bool
+	logger     *slog.Logger
 }
 
 // NewRouterService creates a new router service with the given listen address
 func NewRouterService(listenAddr string) *RouterService {
-	return &RouterService{
+	rs:= &RouterService{
 		router:     http.NewServeMux(),
 		listenAddr: listenAddr,
-		started:    false,
 	}
+	rs.logger = loggerfactory.GetLogger(componentName, rs)
+	return rs
+}
+
+func (rs *RouterService) UpdateLogger() {
+	rs.logger = loggerfactory.GetLogger(componentName, rs)
 }
 
 // RegisterAPI registers a new API with the router service
 func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
 	// Determine base path based on context and version
 	basePath := api.Context
 
@@ -106,13 +113,13 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	rs.router.HandleFunc(swaggerBasePath, func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query()
 		if query.Has("swagger.yaml") {
-			rs.serveSwaggerYAML(w, r, api)
+			rs.serveSwaggerYAML(w, api)
 			return
 		} else if query.Has("swagger.json") {
-			rs.serveSwaggerJSON(w, r, api)
+			rs.serveSwaggerJSON(w, api)
 			return
 		} else if query.Has("swagger.html") {
-			rs.serveSwaggerHTML(w, r, api)
+			rs.serveSwaggerHTML(w, api)
 			return
 		}
 		http.NotFound(w, r)
@@ -128,7 +135,7 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 			// Construct the full pattern: "METHOD /path/to/resource"
 			pattern := method + " " + resource.URITemplate
 			apiHandler.HandleFunc(pattern, rs.createResourceHandler(resource))
-			fmt.Printf("Registered route for API: '%s': %s\n", api.Name, pattern)
+			rs.logger.Info("Registered route for API: '%s': %s", slog.String("api_name", api.Name), slog.String("pattern", pattern))
 			// No need to register explicit OPTIONS handlers when using rs/cors package
 			// The CORSMiddleware already handles OPTIONS preflight requests automatically
 		}
@@ -142,14 +149,6 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 
 	// Register the API handler with the main router
 	rs.router.Handle(basePath+"/", http.StripPrefix(basePath, handler))
-
-	// Start the server if it hasn't been started yet
-	if !rs.started {
-		if err := rs.startServer(ctx); err != nil {
-			return fmt.Errorf("failed to start server: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -185,7 +184,7 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 }
 
 // startServer starts the HTTP server
-func (rs *RouterService) startServer(ctx context.Context) error {
+func (rs *RouterService) StartServer(ctx context.Context) error {
 	rs.server = &http.Server{
 		Addr:    rs.listenAddr,
 		Handler: rs.router,
@@ -193,41 +192,28 @@ func (rs *RouterService) startServer(ctx context.Context) error {
 
 	// Start the server in a goroutine
 	go func() {
-		fmt.Printf("Starting HTTP server on %s\n", rs.listenAddr)
+		rs.logger.Info("Starting HTTP server", slog.String("address", rs.listenAddr))	
 		if err := rs.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("HTTP server error: %v\n", err)
+			rs.logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
 	}()
 
 	// Start a goroutine to monitor context cancellation and shut down server
 	go func() {
 		<-ctx.Done()
-		fmt.Println("Shutting down HTTP server...")
-		if err := rs.Shutdown(ctx); err != nil {
-			fmt.Printf("Error shutting down HTTP server: %v\n", err)
+		rs.logger.Info("Shutting down HTTP server...")
+		if err := rs.server.Shutdown(ctx); err != nil {
+			rs.logger.Error("Error shutting down HTTP server", slog.String("error", err.Error()))
 		} else {
-			fmt.Println("HTTP server stopped gracefully")
+			rs.logger.Info("HTTP server stopped gracefully")
 		}
 	}()
-
-	rs.started = true
 	return nil
 }
 
-// Shutdown gracefully shuts down the server
-func (rs *RouterService) Shutdown(ctx context.Context) error {
-	rs.mu.Lock()
-	defer rs.mu.Unlock()
-
-	if rs.server != nil && rs.started {
-		fmt.Println("Shutting down HTTP server")
-		return rs.server.Shutdown(ctx)
-	}
-	return nil
-}
 
 // serveSwaggerYAML serves the swagger.yaml documentation for the API
-func (rs *RouterService) serveSwaggerYAML(w http.ResponseWriter, r *http.Request, api artifacts.API) {
+func (rs *RouterService) serveSwaggerYAML(w http.ResponseWriter, api artifacts.API) {
 	swagger := rs.generateSwaggerDoc(api)
 	yamlData, err := yaml.Marshal(swagger)
 	if err != nil {
@@ -240,7 +226,7 @@ func (rs *RouterService) serveSwaggerYAML(w http.ResponseWriter, r *http.Request
 }
 
 // serveSwaggerJSON serves the swagger.json documentation for the API
-func (rs *RouterService) serveSwaggerJSON(w http.ResponseWriter, r *http.Request, api artifacts.API) {
+func (rs *RouterService) serveSwaggerJSON(w http.ResponseWriter, api artifacts.API) {
 	swagger := rs.generateSwaggerDoc(api)
 	jsonData, err := json.MarshalIndent(swagger, "", "  ")
 	if err != nil {
@@ -253,7 +239,7 @@ func (rs *RouterService) serveSwaggerJSON(w http.ResponseWriter, r *http.Request
 }
 
 // serveSwaggerHTML serves the swagger.html documentation for the API
-func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, r *http.Request, api artifacts.API) {
+func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.API) {
 	// HTML template for Swagger UI
 	htmlTemplate := `<!DOCTYPE html>
 <html lang="en">
@@ -420,6 +406,5 @@ func (rs *RouterService) extractPathParams(uriTemplate string) []string {
 			params = append(params, paramName)
 		}
 	}
-
 	return params
 }

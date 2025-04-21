@@ -57,11 +57,7 @@ type Deployer struct {
 //    |─ Sequences/
 //    └─ Inbounds/
 
-func NewDeployer(basePath string, inboundMediator ports.InboundMessageMediator) *Deployer {
-	listenAddr := ":8290" // Default port for http connection
-	// Create router service with configured listen address
-	routerService := router.NewRouterService(listenAddr)
-
+func NewDeployer(basePath string, inboundMediator ports.InboundMessageMediator, routerService *router.RouterService) *Deployer {
 	d := &Deployer{
 		basePath:        basePath,
 		inboundMediator: inboundMediator,
@@ -113,6 +109,8 @@ func (d *Deployer) Deploy(ctx context.Context) error {
 			}
 		}
 	}
+	d.routerService.StartServer(ctx)
+	d.logger.Info("Router service started")
 	return nil
 }
 
