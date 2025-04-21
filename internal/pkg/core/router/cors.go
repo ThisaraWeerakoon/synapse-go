@@ -41,7 +41,6 @@ func CORSMiddleware(handler http.Handler, config artifacts.CORSConfig) http.Hand
 		ExposedHeaders:   config.ExposeHeaders,
 		AllowCredentials: config.AllowCredentials,
 		MaxAge:           config.MaxAge,
-		Debug: true,
 	}
 
 	// Create the cors handler
