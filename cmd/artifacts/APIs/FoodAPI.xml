@@ -10,7 +10,7 @@
     <resource methods="GET" uri-template="/order/{category}">
         <inSequence>
             <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
-                <message>message from api get resource</message>
+                <message>message from food api get resource</message>
                 <property name="Log Property message" value="&quot;Welcome to FoodService&quot;"/>
             </log>
         </inSequence>

@@ -41,17 +41,11 @@ const (
 	componentName = "deployers"
 )
 
-type DeployerConfig struct {
-	BasePath   string
-	ListenAddr string
-}
-
 type Deployer struct {
 	inboundMediator ports.InboundMessageMediator
 	routerService   *router.RouterService
 	basePath        string
 	logger 			*slog.Logger
-	config          DeployerConfig
 }
 
 // Synapse/
@@ -65,29 +59,20 @@ type Deployer struct {
 
 func NewDeployer(basePath string, inboundMediator ports.InboundMessageMediator) *Deployer {
 	listenAddr := ":8290" // Default port for http connection
+	// Create router service with configured listen address
+	routerService := router.NewRouterService(listenAddr)
 
-	return NewDeployerWithConfig(DeployerConfig{
-		BasePath:   basePath,
-		ListenAddr: listenAddr,
-	}, inboundMediator)
+	d := &Deployer{
+		basePath:        basePath,
+		inboundMediator: inboundMediator,
+		routerService:   routerService,
+	}
+	d.logger = loggerfactory.GetLogger(componentName, d)
+	return d
 }
 
 func (d *Deployer) UpdateLogger() {
 	d.logger = loggerfactory.GetLogger(componentName,d)
-}
-
-func NewDeployerWithConfig(config DeployerConfig, inboundMediator ports.InboundMessageMediator) *Deployer {
-	// Create router service with configured listen address
-	routerService := router.NewRouterService(config.ListenAddr)
-
-	d:= &Deployer{
-		basePath:        config.BasePath,
-		inboundMediator: inboundMediator,
-		routerService:   routerService,
-		config:          config,
-	}
-	d.logger = loggerfactory.GetLogger(componentName, d)	
-	return d
 }
 
 func (d *Deployer) Deploy(ctx context.Context) error {

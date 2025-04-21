@@ -55,7 +55,6 @@ import (
 type RouterService struct {
 	server     *http.Server
 	router     *http.ServeMux
-	apis       map[string]artifacts.API
 	listenAddr string
 	mu         sync.RWMutex
 	started    bool
@@ -65,7 +64,6 @@ type RouterService struct {
 func NewRouterService(listenAddr string) *RouterService {
 	return &RouterService{
 		router:     http.NewServeMux(),
-		apis:       make(map[string]artifacts.API),
 		listenAddr: listenAddr,
 		started:    false,
 	}
@@ -75,9 +73,6 @@ func NewRouterService(listenAddr string) *RouterService {
 func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) error {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
-
-	// Store the API
-	rs.apis[api.Name] = api
 
 	// Determine base path based on context and version
 	basePath := api.Context
@@ -229,49 +224,6 @@ func (rs *RouterService) Shutdown(ctx context.Context) error {
 		return rs.server.Shutdown(ctx)
 	}
 	return nil
-}
-
-// GetRegisteredRoutes returns all routes registered for a given API
-func (rs *RouterService) GetRegisteredRoutes(apiName string) []string {
-	rs.mu.RLock()
-	defer rs.mu.RUnlock()
-
-	var routes []string
-	api, exists := rs.apis[apiName]
-	if !exists {
-		return routes
-	}
-
-	// Determine base path based on context and version
-	basePath := api.Context
-
-	// Remove trailing slash from context if present
-	if len(basePath) > 1 && basePath[len(basePath)-1] == '/' {
-		basePath = basePath[:len(basePath)-1]
-	}
-
-	// Handle versioning based on versionType
-	if api.Version != "" && api.VersionType != "" {
-		switch api.VersionType {
-		case "url":
-			// For URL type, add version as a path segment
-			basePath = basePath + "/" + api.Version
-		case "context":
-			// For context type, replace {version} placeholder if it exists
-			versionPattern := "{version}"
-			basePath = strings.Replace(basePath, versionPattern, api.Version, 1)
-		}
-	}
-
-	// Collect all routes for this API
-	for _, resource := range api.Resources {
-		for _, method := range resource.Methods {
-			pattern := method + " " + basePath + resource.URITemplate
-			routes = append(routes, pattern)
-		}
-	}
-
-	return routes
 }
 
 // serveSwaggerYAML serves the swagger.yaml documentation for the API
