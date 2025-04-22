@@ -97,10 +97,13 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	// If version is empty, register at /<API_NAME>
 	swaggerBasePath := "/" + api.Name
 	if api.Version != "" {
+		// colon instead of /
 		swaggerBasePath = swaggerBasePath + "/" + api.Version
 	}
 
 	rs.router.HandleFunc(swaggerBasePath, func(w http.ResponseWriter, r *http.Request) {
+
+		// Put the exact without using package
 		query := r.URL.Query()
 		if query.Has("swagger.yaml") {
 			rs.serveSwaggerYAML(w, api)
@@ -151,7 +154,9 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		msgContext := synctx.CreateMsgContext()
 
 		// Set request into message context properties
-		msgContext.Properties["http_request"] = r
+
+		// Delete and fille with message body bte array
+		msgContext.Properties["http_request_body"] = r.Body
 
 		// Set path parameters into message context properties
 		pathParamsMap := make(map[string]string)
@@ -165,6 +170,8 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
+
+		// msgContext eka diha balala network bound operation karanna
 
 		// Write response
 		if success {
@@ -251,6 +258,8 @@ func (rs *RouterService) serveSwaggerJSON(w http.ResponseWriter, api artifacts.A
 	w.Write(jsonData)
 }
 
+// Remove HTML
+
 // serveSwaggerHTML serves the swagger.html documentation for the API
 func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.API) {
 	// HTML template for Swagger UI
@@ -297,6 +306,9 @@ func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.A
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(htmlContent))
 }
+
+
+/////   MOve swagger into API entire thing 
 
 // generateSwaggerDoc creates a swagger/OpenAPI representation of the API
 func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interface{} {
@@ -388,6 +400,8 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 }
 
 // extractPathParams extracts path parameters from a URI template
+
+// /?param={}/
 func (rs *RouterService) extractPathParams(uriTemplate string) []string {
 	params := []string{}
 	segments := strings.Split(uriTemplate, "/")
