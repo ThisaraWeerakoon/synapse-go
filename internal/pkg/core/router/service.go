@@ -206,7 +206,7 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 		rs.logger.Info("Shutting down HTTP server...")
 		// Shutdown the server gracefully
 		if err := rs.server.Shutdown(ctx); err != nil {
-			rs.logger.Error("Error shutting down HTTP server", slog.String("error", err.Error()))
+			rs.logger.Error("Error shutting down HTTP server", "error", err.Error())
 		}
 	}()
 	return nil
