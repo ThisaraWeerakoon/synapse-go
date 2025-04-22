@@ -109,8 +109,6 @@ func (d *Deployer) Deploy(ctx context.Context) error {
 			}
 		}
 	}
-	d.routerService.StartServer(ctx)
-	d.logger.Info("Router service started")
 	return nil
 }
 
