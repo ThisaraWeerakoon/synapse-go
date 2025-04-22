@@ -257,6 +257,36 @@ The HTML documentation URL (`?swagger.html`) provides an interactive Swagger UI 
 
 This makes it easy to share API documentation with developers or test your APIs without additional tools.
 
+### Health and Liveliness Endpoints
+
+Synapse-go provides built-in health and liveliness endpoints to monitor the server status. These are useful for:
+- Container orchestration systems (like Kubernetes) health checks
+- Load balancer health probes
+- Monitoring tools
+- DevOps dashboards
+
+#### Liveliness Endpoint
+
+To check if the Synapse server is functioning properly, you can make a request to:
+
+```
+GET http://localhost:8290/livez
+```
+
+The server will respond with a JSON payload containing:
+- Current server status
+- Timestamp of the response
+
+Example response:
+```json
+{
+  "status": "UP",
+  "timestamp": "2025-04-22T14:30:45Z"
+}
+```
+
+This endpoint is accessible as soon as the server starts, requiring no additional configuration.
+
 **Contributing**
 
 - Fork the repository
