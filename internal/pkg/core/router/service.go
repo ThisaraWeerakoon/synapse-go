@@ -384,26 +384,6 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 
 		paths[resource.URITemplate] = pathItem
 	}
-
-	// Add components section with security schemes if needed
-	if api.CORSConfig.Enabled {
-		// Check if there's any security related headers in CORS config
-		for _, header := range api.CORSConfig.AllowHeaders {
-			if strings.ToLower(header) == "authorization" {
-				swagger["components"] = map[string]interface{}{
-					"securitySchemes": map[string]interface{}{
-						"bearerAuth": map[string]interface{}{
-							"type":         "http",
-							"scheme":       "bearer",
-							"bearerFormat": "JWT",
-						},
-					},
-				}
-				break
-			}
-		}
-	}
-
 	return swagger
 }
 
