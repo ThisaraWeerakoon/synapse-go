@@ -49,10 +49,12 @@ func NewHTTPInboundEndpoint(
 	config domain.InboundConfig,
 	mediator ports.InboundMessageMediator,
 ) *HTTPInboundEndpoint {
-	return &HTTPInboundEndpoint{
+	h := &HTTPInboundEndpoint{
 		config: config,
 		router: http.NewServeMux(),
 	}
+	h.logger = loggerfactory.GetLogger(componentName, h)
+	return h
 }
 
 func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundMessageMediator) error {
