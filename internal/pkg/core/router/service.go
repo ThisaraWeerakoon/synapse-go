@@ -150,17 +150,18 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
 
-		// Store the *http.Request in the message context properties.
-		if msgContext.Properties == nil {
-			msgContext.Properties = make(map[string]string)
-		}
-		//Store pointer to request as string representation
-		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
+		// Set request into message context properties
+		msgContext.Properties["http_request"] = r
 
-		// Set path variables and corresponding values into message context properties
+		// Set path parameters into message context properties
+		pathParamsMap := make(map[string]string)
 		for _, pathParam := range rs.extractPathParams(resource.URITemplate) {
-			msgContext.Properties[pathParam] = r.PathValue(pathParam)
+			pathParamsMap[pathParam] = r.PathValue(pathParam)
 		}
+		msgContext.Properties["path_params"] = pathParamsMap
+
+		// Set query parameters into message context properties
+		msgContext.Properties["query_params"] = r.URL.Query()
 
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
@@ -172,9 +173,6 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 			}
 			if msgContext.Message.RawPayload != nil {
 				w.Write(msgContext.Message.RawPayload)
-			}
-			for name, value := range msgContext.Properties {
-				w.Header().Set(name, value)
 			}
 		} else {
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
