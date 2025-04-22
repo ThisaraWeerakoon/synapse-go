@@ -51,15 +51,17 @@ const (
 type RouterService struct {
 	server     *http.Server
 	router     *http.ServeMux
-	listenAddr string
+	port 		string // :8290
+	hostname   string
 	logger     *slog.Logger
 }
 
-// NewRouterService creates a new router service with the given listen address
-func NewRouterService(listenAddr string) *RouterService {
+// NewRouterService creates a new router service with the given port and hostname 
+func NewRouterService(port string, hostname string) *RouterService {
 	rs := &RouterService{
 		router:     http.NewServeMux(),
-		listenAddr: listenAddr,
+		hostname: 	hostname,
+		port :		port,
 	}
 	rs.logger = loggerfactory.GetLogger(componentName, rs)
 	return rs
@@ -97,10 +99,13 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	// If version is empty, register at /<API_NAME>
 	swaggerBasePath := "/" + api.Name
 	if api.Version != "" {
+		// colon instead of /
 		swaggerBasePath = swaggerBasePath + "/" + api.Version
 	}
 
 	rs.router.HandleFunc(swaggerBasePath, func(w http.ResponseWriter, r *http.Request) {
+
+		// Put the exact without using package
 		query := r.URL.Query()
 		if query.Has("swagger.yaml") {
 			rs.serveSwaggerYAML(w, api)
@@ -151,7 +156,9 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		msgContext := synctx.CreateMsgContext()
 
 		// Set request into message context properties
-		msgContext.Properties["http_request"] = r
+
+		// Delete and fille with message body bte array
+		msgContext.Properties["http_request_body"] = r.Body
 
 		// Set path parameters into message context properties
 		pathParamsMap := make(map[string]string)
@@ -165,6 +172,8 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
+
+		// msgContext eka diha balala network bound operation karanna
 
 		// Write response
 		if success {
@@ -183,8 +192,10 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 
 // startServer starts the HTTP server
 func (rs *RouterService) StartServer(ctx context.Context) error {
+	//eg:- localhost:8290
+	addr := rs.hostname + rs.port	
 	rs.server = &http.Server{
-		Addr:    rs.listenAddr,
+		Addr:    addr,
 		Handler: rs.router,
 	}
 
@@ -194,7 +205,7 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 
 	// Start the server in a goroutine
 	go func() {
-		rs.logger.Info("Starting HTTP server", slog.String("address", rs.listenAddr))
+		rs.logger.Info("Starting HTTP server", "address", addr)
 		if err := rs.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			rs.logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
@@ -251,6 +262,8 @@ func (rs *RouterService) serveSwaggerJSON(w http.ResponseWriter, api artifacts.A
 	w.Write(jsonData)
 }
 
+// Remove HTML
+
 // serveSwaggerHTML serves the swagger.html documentation for the API
 func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.API) {
 	// HTML template for Swagger UI
@@ -297,6 +310,9 @@ func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.A
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(htmlContent))
 }
+
+
+/////   MOve swagger into API entire thing 
 
 // generateSwaggerDoc creates a swagger/OpenAPI representation of the API
 func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interface{} {
@@ -388,6 +404,8 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 }
 
 // extractPathParams extracts path parameters from a URI template
+
+// /?param={}/
 func (rs *RouterService) extractPathParams(uriTemplate string) []string {
 	params := []string{}
 	segments := strings.Split(uriTemplate, "/")

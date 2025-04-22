@@ -25,6 +25,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 
 	"time"
@@ -68,9 +69,26 @@ func Run(ctx context.Context) error {
 
 	mediationEngine := mediation.NewMediationEngine()
 
-	// Initialize the router service
-	listenAddr := ":8290" // Default port for http connection
-	routerService := router.NewRouterService(listenAddr)
+	// Define default port
+	httpServerPort := 8290
+	var hostname string
+	if serverConfig, ok := conCtx.DeploymentConfig["server"].(map[string]string); ok {
+		hostname = serverConfig["hostname"]
+		if offsetStr, offsetExists := serverConfig["offset"]; offsetExists {
+			if offsetInt, err := strconv.Atoi(offsetStr); err == nil {
+				httpServerPort += offsetInt
+				log.Printf("Using port offset: %d, final port: %d", offsetInt, httpServerPort)
+			} else {
+				log.Printf("Warning: Invalid offset value '%s', using default port", offsetStr)
+			}
+		}
+	}
+
+	// Convert the port to a string format expected by the HTTP server
+	listenPort := fmt.Sprintf(":%d", httpServerPort)
+
+	// Initialize the router service with the calculated port
+	routerService := router.NewRouterService(listenPort, hostname)
 
 	artifactsPath := filepath.Join(binDir, "..", "artifacts")
 	deployer := deployers.NewDeployer(artifactsPath, mediationEngine, routerService)
@@ -81,7 +99,7 @@ func Run(ctx context.Context) error {
 
 	// Start HTTP Server
 	routerService.StartServer(ctx)
-	
+
 	elapsed := time.Since(start)
 	log.Printf("Server started in: %v", elapsed)
 
