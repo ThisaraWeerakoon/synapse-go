@@ -21,21 +21,27 @@ package http
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/apache/synapse-go/internal/app/core/domain"
 	"github.com/apache/synapse-go/internal/app/core/ports"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
+	"github.com/apache/synapse-go/internal/pkg/loggerfactory"
 )
 
-// FileInboundEndpoint handles file-based inbound operations
+const (
+	componentName = "http"
+)
+
+// HTTPInboundEndpoint handles http-based inbound operations
 type HTTPInboundEndpoint struct {
 	config    domain.InboundConfig
 	mediator  ports.InboundMessageMediator
 	IsRunning bool
 	server    *http.Server
 	router    *http.ServeMux
+	logger    *slog.Logger
 }
 
 // NewHTTPInboundEndpoint creates a new HTTPInboundEndpoint instance
@@ -67,16 +73,13 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
 
-		// Store the *http.Request in the message context properties.
-		if msgContext.Properties == nil {
-			msgContext.Properties = make(map[string]string)
-		}
-		//Store pointer to request as string representation
-		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
+		// Set request into message context properties
+		msgContext.Properties["http_request"] = r
 
 		// Mediate the inbound message
-		// Call the mediator to process the message
-		h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext)
+		if err := h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext); err != nil {
+			h.logger.Error("Error mediating inbound message", "error", err)
+		}
 	})
 
 	port := h.config.Parameters["inbound.http.port"]
@@ -95,27 +98,30 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 
 	// Start the server in a goroutine
 	go func() {
-		fmt.Printf("Starting HTTP server on %s\n", listenAddr)
+		h.logger.Info("Starting HTTP Inbound listener", "address", listenAddr)
 		if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			fmt.Printf("HTTP server error: %v\n", err)
+			h.logger.Error("HTTP Inbound listener error", "error", err)
 		}
 	}()
 
 	// Start a goroutine to monitor context cancellation and shut down server
 	go func() {
 		<-ctx.Done()
-		fmt.Println("Shutting down HTTP server...")
+		h.logger.Info("Shutting down HTTP server...")
+		// Shutdown the server gracefully
 		if err := h.server.Shutdown(ctx); err != nil {
-			fmt.Printf("Error shutting down HTTP server: %v\n", err)
-		} else {
-			fmt.Println("HTTP server stopped gracefully")
+			h.logger.Error("Error shutting down HTTP server", "error", err.Error())
 		}
 	}()
 	return nil
 }
 
 // call this using a channel
-func (adapter *HTTPInboundEndpoint) Stop() error {
-	adapter.IsRunning = false
+func (h *HTTPInboundEndpoint) Stop() error {
+	h.IsRunning = false
 	return nil
+}
+
+func (h *HTTPInboundEndpoint) UpdateLogger() {
+	h.logger = loggerfactory.GetLogger(componentName, h)
 }
