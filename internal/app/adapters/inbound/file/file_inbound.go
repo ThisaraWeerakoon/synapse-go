@@ -75,7 +75,7 @@ func (inbound *FileInboundEndpoint) Start(ctx context.Context, mediator ports.In
 				fmt.Println("Polling file")
 				// Creating the new message context from file content
 				var context = synctx.MsgContext{
-					Properties: make(map[string]string),
+					Properties: make(map[string]interface{}),
 					Message: synctx.Message{
 						RawPayload:  []byte(fileContent),
 						ContentType: "text/plain",
