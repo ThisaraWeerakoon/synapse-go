@@ -33,6 +33,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"encoding/json"
 
@@ -56,7 +57,7 @@ type RouterService struct {
 
 // NewRouterService creates a new router service with the given listen address
 func NewRouterService(listenAddr string) *RouterService {
-	rs:= &RouterService{
+	rs := &RouterService{
 		router:     http.NewServeMux(),
 		listenAddr: listenAddr,
 	}
@@ -157,7 +158,7 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		msgContext.Properties["http_request"] = fmt.Sprintf("%v", r)
 
 		// Set path variables and corresponding values into message context properties
-		for _,pathParam := range(rs.extractPathParams(resource.URITemplate)){
+		for _, pathParam := range rs.extractPathParams(resource.URITemplate) {
 			msgContext.Properties[pathParam] = r.PathValue(pathParam)
 		}
 
@@ -189,9 +190,13 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 		Handler: rs.router,
 	}
 
+	// Register health/liveness endpoints
+	rs.registerLivelinessEndpoint()
+	rs.logger.Info("liveness endpoint registered")
+
 	// Start the server in a goroutine
 	go func() {
-		rs.logger.Info("Starting HTTP server", slog.String("address", rs.listenAddr))	
+		rs.logger.Info("Starting HTTP server", slog.String("address", rs.listenAddr))
 		if err := rs.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			rs.logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
@@ -201,6 +206,7 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 	go func() {
 		<-ctx.Done()
 		rs.logger.Info("Shutting down HTTP server...")
+		// Shutdown the server gracefully
 		if err := rs.server.Shutdown(ctx); err != nil {
 			rs.logger.Error("Error shutting down HTTP server", slog.String("error", err.Error()))
 		}
@@ -208,6 +214,18 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 	return nil
 }
 
+// registerHealthEndpoints registers health and liveness endpoints
+func (rs *RouterService) registerLivelinessEndpoint() {
+	// liveliness probe endpoint
+	rs.router.HandleFunc("/livez", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":    "UP",
+			"timestamp": time.Now().Format(time.RFC3339),
+		})
+	})
+}
 
 // serveSwaggerYAML serves the swagger.yaml documentation for the API
 func (rs *RouterService) serveSwaggerYAML(w http.ResponseWriter, api artifacts.API) {
