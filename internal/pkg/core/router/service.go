@@ -155,9 +155,7 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 		// Create message context
 		msgContext := synctx.CreateMsgContext()
 
-		// Set request into message context properties
-
-		// Delete and fille with message body bte array
+		// Set request body into message context properties
 		msgContext.Properties["http_request_body"] = r.Body
 
 		// Set path parameters into message context properties

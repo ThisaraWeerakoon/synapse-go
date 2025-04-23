@@ -20,7 +20,9 @@
 package artifacts
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
 )
@@ -34,5 +36,25 @@ type LogMediator struct {
 func (lm LogMediator) Execute(context *synctx.MsgContext) (bool, error) {
 	// Log the message
 	fmt.Println(lm.Category + " : " + lm.Message)
+
+	// Check if http_request_body exists in properties
+	if bodyObj, exists := context.Properties["http_request_body"]; exists {
+		// Read the request body (io.ReadCloser)
+		if requestBody, ok := bodyObj.(io.ReadCloser); ok {
+			// Read the body data
+			bodyBytes, err := io.ReadAll(requestBody)
+			if err == nil {
+				// Log the body content
+				fmt.Printf("%s : HTTP Request Body: %s\n", lm.Category, string(bodyBytes))
+
+				// Important: Create a new ReadCloser and put it back in the context
+				// so other mediators can also read it
+				context.Properties["http_request_body"] = io.NopCloser(bytes.NewBuffer(bodyBytes))
+			} else {
+				fmt.Printf("%s : Error reading request body: %v\n", lm.Category, err)
+			}
+		}
+	}
+
 	return true, nil
 }
