@@ -49,19 +49,19 @@ const (
 
 // RouterService manages API routing and server lifecycle
 type RouterService struct {
-	server     *http.Server
-	router     *http.ServeMux
-	port 		string // :8290
-	hostname   string
-	logger     *slog.Logger
+	server   *http.Server
+	router   *http.ServeMux
+	port     string // :8290
+	hostname string
+	logger   *slog.Logger
 }
 
-// NewRouterService creates a new router service with the given port and hostname 
+// NewRouterService creates a new router service with the given port and hostname
 func NewRouterService(port string, hostname string) *RouterService {
 	rs := &RouterService{
-		router:     http.NewServeMux(),
-		hostname: 	hostname,
-		port :		port,
+		router:   http.NewServeMux(),
+		hostname: hostname,
+		port:     port,
 	}
 	rs.logger = loggerfactory.GetLogger(componentName, rs)
 	return rs
@@ -128,8 +128,10 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 		// Register a handler for each HTTP method in the resource
 		for _, method := range resource.Methods {
 			// Construct the full pattern: "METHOD /path/to/resource"
-			pattern := method + " " + resource.URITemplate
-			apiHandler.HandleFunc(pattern, rs.createResourceHandler(resource))
+			pattern := method + " " + resource.URITemplate.PathTemplate
+			// Create a wrapper handler that checks query parameters before forwarding to the resource handler
+			queryParamHandler := rs.createQueryParamMiddleware(resource, rs.createResourceHandler(resource))
+			apiHandler.HandleFunc(pattern, queryParamHandler)
 			rs.logger.Info("Registered route for API",
 				slog.String("api_name", api.Name),
 				slog.String("pattern", pattern))
@@ -160,18 +162,34 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 
 		// Set path parameters into message context properties
 		pathParamsMap := make(map[string]string)
-		for _, pathParam := range rs.extractPathParams(resource.URITemplate) {
+		for _, pathParam := range resource.URITemplate.PathParameters {
 			pathParamsMap[pathParam] = r.PathValue(pathParam)
 		}
-		msgContext.Properties["path_params"] = pathParamsMap
+		msgContext.Properties["uriParams"] = pathParamsMap
 
 		// Set query parameters into message context properties
-		msgContext.Properties["query_params"] = r.URL.Query()
+		queryParams := r.URL.Query()
+
+		// If there are predefined query parameters, map each to their corresponding variable
+		if len(resource.URITemplate.QueryParameters) > 0 {
+			// Create a map to store the variable mappings
+			queryVarMap := make(map[string]string)
+
+			// Loop through each predefined query parameter
+			for paramName, varName := range resource.URITemplate.QueryParameters {
+				// Get the value from the request
+				if values, exists := queryParams[paramName]; exists && len(values) > 0 {
+					// Map the query parameter value to the variable name
+					queryVarMap[varName] = values[0]
+				}
+			}
+
+			// Store the variable mapping in the message context
+			msgContext.Properties["queryParams"] = queryVarMap
+		}
 
 		// Process through mediation pipeline
 		success := resource.Mediate(msgContext)
-
-		// msgContext eka diha balala network bound operation karanna
 
 		// Write response
 		if success {
@@ -188,10 +206,46 @@ func (rs *RouterService) createResourceHandler(resource artifacts.Resource) http
 	return handler
 }
 
+// createQueryParamMiddleware creates a middleware that validates query parameters against predefined parameters
+func (rs *RouterService) createQueryParamMiddleware(resource artifacts.Resource, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// If there are no predefined query parameters, just call the next handler
+		if len(resource.URITemplate.QueryParameters) == 0 {
+			next(w, r)
+			return
+		}
+
+		// Get query parameters from the request
+		queryParams := r.URL.Query()
+
+		// Check if query parameter keys match exactly with the predefined keys
+		// First, ensure all request query params exist in predefined params
+		for key := range queryParams {
+			if _, exists := resource.URITemplate.QueryParameters[key]; !exists {
+				// Query parameter not defined in the template, reject the request
+				http.Error(w, fmt.Sprintf("Unsupported query parameter: %s", key), http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Now ensure all predefined query params exist in the request
+		for key := range resource.URITemplate.QueryParameters {
+			if !queryParams.Has(key) {
+				// Required query parameter is missing, reject the request
+				http.Error(w, fmt.Sprintf("Missing required query parameter: %s", key), http.StatusBadRequest)
+				return
+			}
+		}
+
+		// All parameters in the request are valid and all required parameters are present
+		next(w, r)
+	}
+}
+
 // startServer starts the HTTP server
 func (rs *RouterService) StartServer(ctx context.Context) error {
 	//eg:- localhost:8290
-	addr := rs.hostname + rs.port	
+	addr := rs.hostname + rs.port
 	rs.server = &http.Server{
 		Addr:    addr,
 		Handler: rs.router,
@@ -309,8 +363,7 @@ func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.A
 	w.Write([]byte(htmlContent))
 }
 
-
-/////   MOve swagger into API entire thing 
+/////   MOve swagger into API entire thing
 
 // generateSwaggerDoc creates a swagger/OpenAPI representation of the API
 func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interface{} {
@@ -364,7 +417,7 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 			operation := map[string]interface{}{
 				"summary":     fmt.Sprintf("%s %s", method, resource.URITemplate),
 				"description": fmt.Sprintf("Operation for %s %s", method, resource.URITemplate),
-				"operationId": fmt.Sprintf("%s_%s", methodLower, strings.ReplaceAll(strings.Trim(resource.URITemplate, "/"), "/", "_")),
+				"operationId": fmt.Sprintf("%s_%s", methodLower, strings.ReplaceAll(strings.Trim(resource.URITemplate.FullTemplate, "/"), "/", "_")),
 				"responses": map[string]interface{}{
 					"200": map[string]interface{}{
 						"description": "Successful operation",
@@ -376,7 +429,7 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 			}
 
 			// Extract path parameters
-			params := rs.extractPathParams(resource.URITemplate)
+			params := resource.URITemplate.PathParameters
 			if len(params) > 0 {
 				paramDefs := []map[string]interface{}{}
 				for _, param := range params {
@@ -396,24 +449,7 @@ func (rs *RouterService) generateSwaggerDoc(api artifacts.API) map[string]interf
 			pathItem[methodLower] = operation
 		}
 
-		paths[resource.URITemplate] = pathItem
+		paths[resource.URITemplate.FullTemplate] = pathItem
 	}
 	return swagger
-}
-
-// extractPathParams extracts path parameters from a URI template
-
-// /?param={}/
-func (rs *RouterService) extractPathParams(uriTemplate string) []string {
-	params := []string{}
-	segments := strings.Split(uriTemplate, "/")
-
-	for _, segment := range segments {
-		if strings.HasPrefix(segment, "{") && strings.HasSuffix(segment, "}") {
-			// Extract parameter name without braces
-			paramName := segment[1 : len(segment)-1]
-			params = append(params, paramName)
-		}
-	}
-	return params
 }

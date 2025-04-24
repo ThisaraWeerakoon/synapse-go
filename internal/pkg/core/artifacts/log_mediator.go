@@ -56,5 +56,34 @@ func (lm LogMediator) Execute(context *synctx.MsgContext) (bool, error) {
 		}
 	}
 
+	// Check if pathparams exists in properties
+	if pathParamsObj, exists := context.Properties["uriParams"]; exists {
+		// Read the pathparams (map[string]string)
+		if pathParams, ok := pathParamsObj.(map[string]string); ok {
+			// Log the pathparams
+			for key, value := range pathParams {
+				fmt.Printf("%s : Pathparam %s: %s\n", lm.Category, key, value)
+			}
+		} else {
+			fmt.Printf("%s : Error casting pathparams to map[string]string\n", lm.Category)
+		}
+	} else {
+		fmt.Printf("%s : Pathparams not found in properties\n", lm.Category)
+	}
+
+	// Check if queryparams exists in properties
+	if queryParamsObj, exists := context.Properties["queryParams"]; exists {
+		// Read the queryparams (map[string]string)
+		if queryParams, ok := queryParamsObj.(map[string]string); ok {
+			// Log the queryparams
+			for key, value := range queryParams {
+				fmt.Printf("%s : Queryparam %s: %s\n", lm.Category, key, value)
+			}
+		} else {
+			fmt.Printf("%s : Error casting queryparams to map[string]string\n", lm.Category)
+		}
+	} else {
+		fmt.Printf("%s : Queryparams not found in properties\n", lm.Category)
+	}
 	return true, nil
 }
