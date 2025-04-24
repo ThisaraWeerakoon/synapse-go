@@ -99,8 +99,7 @@ func (rs *RouterService) RegisterAPI(ctx context.Context, api artifacts.API) err
 	// If version is empty, register at /<API_NAME>
 	swaggerBasePath := "/" + api.Name
 	if api.Version != "" {
-		// colon instead of /
-		swaggerBasePath = swaggerBasePath + "/" + api.Version
+		swaggerBasePath = swaggerBasePath + ":" + api.Version
 	}
 
 	rs.router.HandleFunc(swaggerBasePath, func(w http.ResponseWriter, r *http.Request) {
@@ -353,7 +352,7 @@ func (rs *RouterService) serveSwaggerHTML(w http.ResponseWriter, api artifacts.A
 
 	var swaggerJsonUrl string
 	if api.Version != "" {
-		swaggerJsonUrl = fmt.Sprintf("/%s/%s", api.Name, api.Version)
+		swaggerJsonUrl = fmt.Sprintf("/%s:%s", api.Name, api.Version)
 	} else {
 		swaggerJsonUrl = fmt.Sprintf("/%s", api.Name)
 	}

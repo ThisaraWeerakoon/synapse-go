@@ -233,8 +233,8 @@ For any API named `<API_NAME>`, you can access its Swagger documentation at:
 If your API has a version specified (e.g., `version="1.0"` in the API definition), the documentation URLs include the version:
 
 - `http://localhost:8290/<API_NAME>/<API_VERSION>?swagger.yaml`
-- `http://localhost:8290/<API_NAME>/<API_VERSION>?swagger.json`
-- `http://localhost:8290/<API_NAME>/<API_VERSION>?swagger.html`
+- `http://localhost:8290/<API_NAME>:<API_VERSION>?swagger.json`
+- `http://localhost:8290/<API_NAME>:<API_VERSION>?swagger.html`
 
 #### Generated Documentation Includes
 
