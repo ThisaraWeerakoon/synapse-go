@@ -67,7 +67,7 @@ func TestAPI_Unmarshal(t *testing.T) {
 	if resource.Methods[0] != "GET" {
 		t.Errorf("Expected methods 'GET', got %v", resource.Methods)
 	}
-	if resource.URITemplate != "/resource1" {
+	if resource.URITemplate.FullTemplate != "/resource1" {
 		t.Errorf("Expected uri-template '/resource1', got %s", resource.URITemplate)
 	}
 
@@ -229,7 +229,7 @@ func TestAPI_UnmarshalWithNestedSequence(t *testing.T) {
 	if resource.Methods[0] != "GET" {
 		t.Errorf("Expected methods 'GET', got %v", resource.Methods)
 	}
-	if resource.URITemplate != "/resource1" {
+	if resource.URITemplate.FullTemplate != "/resource1" {
 		t.Errorf("Expected uri-template '/resource1', got %s", resource.URITemplate)
 	}
 

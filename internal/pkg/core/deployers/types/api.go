@@ -22,17 +22,21 @@ package types
 import (
 	"encoding/xml"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 )
 
+// Regular expression to find path parameters in the format {paramName}
+var pathParamRegex = regexp.MustCompile(`\{([^}]+)\}`)
+
 type Resource struct {
-	Methods       string             `xml:"methods,attr"`
-	URITemplate   string             `xml:"uri-template,attr"`
-	InSequence    artifacts.Sequence `xml:"inSequence"`
-	FaultSequence artifacts.Sequence `xml:"faultSequence"`
+	Methods       string                    `xml:"methods,attr"`
+	URITemplate   artifacts.URITemplateInfo `xml:"uri-template,attr"`
+	InSequence    artifacts.Sequence        `xml:"inSequence"`
+	FaultSequence artifacts.Sequence        `xml:"faultSequence"`
 }
 
 type API struct {
@@ -200,13 +204,14 @@ func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, posit
 	// Extract attributes from the <resource> element
 	res := artifacts.Resource{}
 	var methodsStr string
+	var uriTemplate string
 
 	for _, attr := range start.Attr {
 		switch attr.Name.Local {
 		case "methods":
 			methodsStr = attr.Value
 		case "uri-template":
-			res.URITemplate = attr.Value
+			uriTemplate = attr.Value
 		}
 	}
 
@@ -215,8 +220,19 @@ func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, posit
 		res.Methods = strings.Fields(methodsStr)
 	}
 
+	// Parse the URI template if provided
+	if uriTemplate != "" {
+		// Parse and validate the URI template
+		parsedInfo, err := r.parseURITemplate(uriTemplate)
+		if err != nil {
+			return artifacts.Resource{}, fmt.Errorf("invalid URI template '%s': %w", uriTemplate, err)
+		}
+		// Store the parsed URI template info in the artifacts.Resource
+		res.URITemplate = parsedInfo
+	}
+
 	// Process child elements - use a labeled loop for cleaner exiting
-	parsingLoop:
+parsingLoop:
 	for {
 		token, err := decoder.Token()
 		if err != nil {
@@ -242,10 +258,10 @@ func (r *Resource) Unmarshal(decoder *xml.Decoder, start xml.StartElement, posit
 				}
 			}
 		case xml.EndElement:
-            // Stop when the </resource> tag is encountered
-            if elem.Name.Local == "resource" {
-                break parsingLoop
-            }
+			// Stop when the </resource> tag is encountered
+			if elem.Name.Local == "resource" {
+				break parsingLoop
+			}
 		}
 	}
 	return res, nil
@@ -257,7 +273,7 @@ func (r *Resource) decodeSequence(decoder *xml.Decoder, position artifacts.Posit
 	position = artifacts.Position{
 		FileName:  position.FileName,
 		LineNo:    line,
-		Hierarchy: position.Hierarchy + "->" + res.URITemplate + "->" + sequenceType,
+		Hierarchy: position.Hierarchy + "->" + res.URITemplate.FullTemplate + "->" + sequenceType,
 	}
 
 	// Check if the next element is a sequence tag
@@ -325,4 +341,70 @@ func (r *Resource) decodeSequence(decoder *xml.Decoder, position artifacts.Posit
 			}
 		}
 	}
+}
+
+func (r *Resource) parseURITemplate(uriTemplate string) (artifacts.URITemplateInfo, error) {
+	parsedInfo := artifacts.URITemplateInfo{
+		FullTemplate:  uriTemplate,
+		PathParameters: []string{},
+		QueryParameters: make(map[string]string),
+	}
+
+	// Split the URI template into path and query parts
+	parts := strings.SplitN(uriTemplate, "?", 2)
+	pathPart := parts[0]
+	parsedInfo.PathTemplate = pathPart
+
+	var queryPart string
+	if len(parts) > 1 {
+		queryPart = parts[1]
+	}
+
+	// Extract path parameters
+	pathSegments := strings.Split(pathPart, "/")
+	paramSet := make(map[string]bool) // To track duplicate parameters
+
+	for _, segment := range pathSegments {
+		matches := pathParamRegex.FindStringSubmatch(segment)
+		if len(matches) > 1 {
+			paramName := matches[1]
+			if paramSet[paramName] {
+				return artifacts.URITemplateInfo{}, fmt.Errorf("duplicate path parameter: %s in uri-template: %s", paramName, uriTemplate)
+			}
+			paramSet[paramName] = true
+			parsedInfo.PathParameters = append(parsedInfo.PathParameters, paramName)
+		} else if strings.Contains(segment, "{") || strings.Contains(segment, "}") {
+			return artifacts.URITemplateInfo{}, fmt.Errorf("invalid path parameter format in segment: '%s' of uri-template: %s. Expected '{paramName}'", segment, uriTemplate)
+		}
+	}
+
+	// Extract query parameters
+	if queryPart != "" {
+		queryPairs := strings.Split(queryPart, "&")
+		for _, pair := range queryPairs {
+			keyValue := strings.SplitN(pair, "=", 2)
+			if len(keyValue) == 2 {
+				key := keyValue[0]
+				value := keyValue[1]
+				if _, exists := parsedInfo.QueryParameters[key]; exists {
+					return artifacts.URITemplateInfo{}, fmt.Errorf("duplicate query parameter: %s in uri-template: %s", key, uriTemplate)
+				}
+
+				// Check if value follows the format {value}
+				if !strings.HasPrefix(value, "{") || !strings.HasSuffix(value, "}") {
+					return artifacts.URITemplateInfo{}, fmt.Errorf("invalid query parameter value format: '%s' in uri-template: %s. Expected format 'queryparam={value}'", pair, uriTemplate)
+				}
+
+				// Remove curly braces from the value
+				value = strings.TrimPrefix(value, "{")
+				value = strings.TrimSuffix(value, "}")
+				parsedInfo.QueryParameters[key] = value
+			} else if len(keyValue) == 1 && keyValue[0] != "" {
+				return artifacts.URITemplateInfo{}, fmt.Errorf("invalid query parameter format: '%s' in uri-template: %s. Expected 'key=value'", pair, uriTemplate)
+			} else if len(keyValue) == 0 && pair != "" {
+				return artifacts.URITemplateInfo{}, fmt.Errorf("invalid query parameter format: '%s' in uri-template: %s. Expected 'key=value'", pair, uriTemplate)
+			}
+		}
+	}
+	return parsedInfo, nil
 }

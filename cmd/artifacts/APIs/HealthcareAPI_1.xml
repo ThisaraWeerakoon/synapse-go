@@ -7,7 +7,7 @@
         expose-headers="X-Request-ID,X-Response-Time"
         allow-credentials="true"
         max-age="3600" />
-    <resource methods="GET" uri-template="/querydoctor_1/{category}">
+    <resource methods="GET" uri-template="/querydoctor_1/{category}?name={name}&amp;age={age}">
         <inSequence>
             <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
                 <message>message from healthcare api (version 1) get querydoctor resource</message>

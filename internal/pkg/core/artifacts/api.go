@@ -25,9 +25,16 @@ import (
 
 type Resource struct {
 	Methods       []string
-	URITemplate   string
+	URITemplate   URITemplateInfo
 	InSequence    Sequence
 	FaultSequence Sequence
+}
+
+type URITemplateInfo struct {
+	FullTemplate    string            // The original full URI template
+	PathTemplate    string            // Just the path part (without query)
+	PathParameters  []string          // List of path parameters
+	QueryParameters map[string]string // Map of query param name to variable name
 }
 
 type API struct {
