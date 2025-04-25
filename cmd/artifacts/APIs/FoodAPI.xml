@@ -21,7 +21,7 @@
             </log>
         </faultSequence>
     </resource>
-    <resource methods="POST" uri-template="/payfood/{category}">
+    <resource methods="GET" uri-template="/payfood/{category}">
         <inSequence>
             <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
                 <message>message from food api post resource</message>

@@ -21,7 +21,7 @@
             </log>
         </faultSequence>
     </resource>
-        <resource methods="POST GET PATCH" uri-template="/changedoctor_1/{category}">
+        <resource methods="GET" uri-template="/changedoctor_1/{category}">
         <inSequence>
             <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
                 <message>message from healthcare api (version 1) post get patch changedoctor resource</message>

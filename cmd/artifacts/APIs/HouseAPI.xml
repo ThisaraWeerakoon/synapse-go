@@ -21,7 +21,7 @@
             </log>
         </faultSequence>
     </resource>
-        <resource methods="POST GET PATCH" uri-template="/changeHouse/{category}">
+        <resource methods="GET" uri-template="/changeHouse/{category}">
         <inSequence>
             <log category="INFO" logMessageID="false" logFullPayload="false" description="Request Log">
                 <message>message from house api post get patch changehouse resource</message>
