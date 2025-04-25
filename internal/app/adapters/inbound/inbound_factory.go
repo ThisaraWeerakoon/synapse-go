@@ -17,30 +17,35 @@
  *  under the License.
  */
 
-package inbound
+ package inbound
 
-import (
-	"errors"
-
-	"github.com/apache/synapse-go/internal/app/core/domain"
-	"github.com/apache/synapse-go/internal/app/core/ports"
-)
-
-var (
-	ErrInboundTypeNotFound = errors.New("inbound type not found")
-)
-
-func NewInbound(config domain.InboundConfig) (ports.InboundEndpoint, error) {
-	switch config.Protocol {
-	case "file":
-		return NewFileInboundEndpoint(
-			config, 
-			NewOSFileSystem(), 
-			NewRealClock(), 
-			NewDefaultLogger(), 
-			nil,
-		),nil
-	default:
-		return nil, ErrInboundTypeNotFound
-	}
-}
+ import (
+	 "errors"
+ 
+	 "github.com/apache/synapse-go/internal/app/adapters/inbound/file"
+	 "github.com/apache/synapse-go/internal/app/adapters/inbound/http"
+	 "github.com/apache/synapse-go/internal/app/core/domain"
+	 "github.com/apache/synapse-go/internal/app/core/ports"
+ )
+ 
+ var (
+	 ErrInboundTypeNotFound = errors.New("inbound type not found")
+ )
+ 
+ func NewInbound(config domain.InboundConfig) (ports.InboundEndpoint, error) {
+	 switch config.Protocol {
+	 case "file":
+		 return file.NewFileInboundEndpoint(
+			 config,
+			 nil,
+		 ), nil
+ 
+	 case "http":
+		 return http.NewHTTPInboundEndpoint(
+			 config,
+			 nil,
+		 ), nil
+	 default:
+		 return nil, ErrInboundTypeNotFound
+	 }
+ }
