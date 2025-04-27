@@ -17,18 +17,20 @@
  *  under the License.
  */
 
- package http
+package http
 
- import (
-	 "context"
-	 "log/slog"
-	 "net/http"
- 
-	 "github.com/apache/synapse-go/internal/app/core/domain"
-	 "github.com/apache/synapse-go/internal/app/core/ports"
-	 "github.com/apache/synapse-go/internal/pkg/core/synctx"
-	 "github.com/apache/synapse-go/internal/pkg/loggerfactory"
- )
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/apache/synapse-go/internal/app/core/domain"
+	"github.com/apache/synapse-go/internal/app/core/ports"
+	"github.com/apache/synapse-go/internal/pkg/core/synctx"
+	"github.com/apache/synapse-go/internal/pkg/loggerfactory"
+)
  
  const (
 	 componentName = "http"
@@ -78,15 +80,26 @@
 		 // Set request into message context properties
 		 msgContext.Properties["http_request_body"] = r.Body
  
-		 // Mediate the inbound message
-		 if err := h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext); err != nil {
-			 h.logger.Error("Error mediating inbound message", "error", err)
-		 }
-		 // ????
- 
- 
- 
-		 // How response is sending automatically ???
+		// Mediate the inbound message
+		// if err := h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext); err != nil {
+		// 	h.logger.Error("Error mediating inbound message", "error", err)
+		// 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		// 	return
+		// }
+
+		// Check if the http-response flag is set by the respond mediator
+		// responseFlag, exists := msgContext.Headers["http-response"]
+		// if !exists || responseFlag != "true" {
+		// 	// No response flag found or not set to true
+		// 	// This means the mediator chain doesn't want to send a response yet
+		// 	h.logger.Debug("No response flag found, skipping response")
+		// 	return
+		// }
+
+		// Send the response back to the client
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"message": "Inbound Mediation successful"}`))
 	 })
  
 	 port := h.config.Parameters["inbound.http.port"]
@@ -106,27 +119,31 @@
 	 // Start the server in a goroutine
 	 go func() {
 		 h.logger.Info("Starting HTTP Inbound listener", "address", listenAddr)
-		 if err := h.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		 if err := h.server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			 h.logger.Error("HTTP Inbound listener error", "error", err)
 		 }
+		 h.logger.Info("HTTP inbound server stopped serving new connections")
 	 }()
  
-	 // Start a goroutine to monitor context cancellation and shut down server
-	 go func() {
-		 <-ctx.Done()
-		 h.logger.Info("Shutting down HTTP server...")
-		 // Shutdown the server gracefully
-		 if err := h.server.Shutdown(ctx); err != nil {
-			 h.logger.Error("Error shutting down HTTP server", "error", err.Error())
-		 }
-	 }()
+
+	if err := h.Stop(ctx); err != nil {
+		h.logger.Error("Error shutting down HTTP Inbound server", "error", err.Error())
+	}
+	h.logger.Info("HTTP Inbound server shut down gracefully")
 	 return nil
  }
  
- // call this using a channel
- func (h *HTTPInboundEndpoint) Stop() error {
-	 h.IsRunning = false
-	 return nil
+ // Stops HTTP server gracefully
+ func (h *HTTPInboundEndpoint) Stop(ctx context.Context) error {
+	<-ctx.Done()
+	h.logger.Info("Shutting down HTTP Inbond server...")
+	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownRelease()
+	if err := h.server.Shutdown(shutdownCtx); err != nil {
+		return err
+	}
+	h.IsRunning = false
+	return nil
  }
  
  func (h *HTTPInboundEndpoint) UpdateLogger() {

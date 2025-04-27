@@ -93,7 +93,7 @@
  }
  
  // call this using a channel
- func (adapter *FileInboundEndpoint) Stop() error {
+ func (adapter *FileInboundEndpoint) Stop(ctx context.Context) error {
 	 adapter.IsRunning = false
 	 return nil
  }
