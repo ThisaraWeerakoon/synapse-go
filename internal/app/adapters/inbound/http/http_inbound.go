@@ -31,110 +31,110 @@ import (
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
 	"github.com/apache/synapse-go/internal/pkg/loggerfactory"
 )
- 
- const (
-	 componentName = "http"
- )
- 
- // HTTPInboundEndpoint handles http-based inbound operations
- type HTTPInboundEndpoint struct {
-	 config    domain.InboundConfig
-	 mediator  ports.InboundMessageMediator
-	 IsRunning bool
-	 server    *http.Server
-	 router    *http.ServeMux
-	 logger    *slog.Logger
- }
- 
- // NewHTTPInboundEndpoint creates a new HTTPInboundEndpoint instance
- func NewHTTPInboundEndpoint(
-	 config domain.InboundConfig,
-	 mediator ports.InboundMessageMediator,
- ) *HTTPInboundEndpoint {
-	 h := &HTTPInboundEndpoint{
-		 config: config,
-		 router: http.NewServeMux(),
-	 }
-	 h.logger = loggerfactory.GetLogger(componentName, h)
-	 return h
- }
- 
- func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundMessageMediator) error {
-	 // Check if context is already canceled before proceeding
-	 select {
-	 case <-ctx.Done():
-		 // Context already canceled, don't decrement WaitGroup
-		 return ctx.Err()
-	 default:
-		 // Context still valid, proceed with normal operation
-	 }
- 
-	 h.IsRunning = true
-	 h.mediator = mediator
- 
-	 // Set up the HTTP handler for the root path
-	 h.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		 // Create message context
-		 msgContext := synctx.CreateMsgContext()
- 
-		 // Set request into message context properties
-		 msgContext.Properties["http_request_body"] = r.Body
- 
+
+const (
+	componentName = "http"
+)
+
+// HTTPInboundEndpoint handles http-based inbound operations
+type HTTPInboundEndpoint struct {
+	config    domain.InboundConfig
+	mediator  ports.InboundMessageMediator
+	IsRunning bool
+	server    *http.Server
+	router    *http.ServeMux
+	logger    *slog.Logger
+}
+
+// NewHTTPInboundEndpoint creates a new HTTPInboundEndpoint instance
+func NewHTTPInboundEndpoint(
+	config domain.InboundConfig,
+	mediator ports.InboundMessageMediator,
+) *HTTPInboundEndpoint {
+	h := &HTTPInboundEndpoint{
+		config: config,
+		router: http.NewServeMux(),
+	}
+	h.logger = loggerfactory.GetLogger(componentName, h)
+	return h
+}
+
+func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundMessageMediator) error {
+	// Check if context is already canceled before proceeding
+	select {
+	case <-ctx.Done():
+		// Context already canceled, don't decrement WaitGroup
+		return ctx.Err()
+	default:
+		// Context still valid, proceed with normal operation
+	}
+
+	h.IsRunning = true
+	h.mediator = mediator
+
+	// Set up the HTTP handler for the root path
+	h.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Create message context
+		msgContext := synctx.CreateMsgContext()
+
+		// Set request into message context properties
+		msgContext.Properties["http_request_body"] = r.Body
+
 		// Mediate the inbound message
-		// if err := h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext); err != nil {
-		// 	h.logger.Error("Error mediating inbound message", "error", err)
-		// 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		// 	return
-		// }
+		if err := h.mediator.MediateInboundMessage(ctx, h.config.SequenceName, msgContext); err != nil {
+			h.logger.Error("Error mediating inbound message", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 
 		// Check if the http-response flag is set by the respond mediator
-		// responseFlag, exists := msgContext.Headers["http-response"]
-		// if !exists || responseFlag != "true" {
-		// 	// No response flag found or not set to true
-		// 	// This means the mediator chain doesn't want to send a response yet
-		// 	h.logger.Debug("No response flag found, skipping response")
-		// 	return
-		// }
+		responseFlag, exists := msgContext.Headers["http-response"]
+		if !exists || responseFlag != "true" {
+			// Send a simple 202 Accepted response when http-response flag is not properly set
+			h.logger.Debug("http-response flag not set, sending 202 Accepted response")
+			// Send 202 Accepted status
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
 
 		// Send the response back to the client
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"message": "Inbound Mediation successful"}`))
-	 })
- 
-	 port := h.config.Parameters["inbound.http.port"]
- 
-	 // Ensure the port has the proper format with colon prefix
-	 listenAddr := ":" + port
-	 if port[0] == ':' {
-		 listenAddr = port // Port already has colon prefix
-	 }
- 
-	 // Create a new HTTP server
-	 h.server = &http.Server{
-		 Addr:    listenAddr,
-		 Handler: h.router,
-	 }
- 
-	 // Start the server in a goroutine
-	 go func() {
-		 h.logger.Info("Starting HTTP Inbound listener", "address", listenAddr)
-		 if err := h.server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			 h.logger.Error("HTTP Inbound listener error", "error", err)
-		 }
-		 h.logger.Info("HTTP inbound server stopped serving new connections")
-	 }()
- 
+	})
+
+	port := h.config.Parameters["inbound.http.port"]
+
+	// Ensure the port has the proper format with colon prefix
+	listenAddr := ":" + port
+	if port[0] == ':' {
+		listenAddr = port // Port already has colon prefix
+	}
+
+	// Create a new HTTP server
+	h.server = &http.Server{
+		Addr:    listenAddr,
+		Handler: h.router,
+	}
+
+	// Start the server in a goroutine
+	go func() {
+		h.logger.Info("Starting HTTP Inbound listener", "address", listenAddr)
+		if err := h.server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			h.logger.Error("HTTP Inbound listener error", "error", err)
+		}
+		h.logger.Info("HTTP inbound server stopped serving new connections")
+	}()
 
 	if err := h.Stop(ctx); err != nil {
 		h.logger.Error("Error shutting down HTTP Inbound server", "error", err.Error())
 	}
 	h.logger.Info("HTTP Inbound server shut down gracefully")
-	 return nil
- }
- 
- // Stops HTTP server gracefully
- func (h *HTTPInboundEndpoint) Stop(ctx context.Context) error {
+	return nil
+}
+
+// Stops HTTP server gracefully
+func (h *HTTPInboundEndpoint) Stop(ctx context.Context) error {
 	<-ctx.Done()
 	h.logger.Info("Shutting down HTTP Inbond server...")
 	shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
@@ -144,9 +144,8 @@ import (
 	}
 	h.IsRunning = false
 	return nil
- }
- 
- func (h *HTTPInboundEndpoint) UpdateLogger() {
-	 h.logger = loggerfactory.GetLogger(componentName, h)
- }
- 
+}
+
+func (h *HTTPInboundEndpoint) UpdateLogger() {
+	h.logger = loggerfactory.GetLogger(componentName, h)
+}
