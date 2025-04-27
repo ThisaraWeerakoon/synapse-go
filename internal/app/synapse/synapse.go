@@ -105,6 +105,8 @@ func Run(ctx context.Context) error {
 
 	<-ctx.Done()
 	wg.Wait()
+	routerService.StopServer()
+	log.Println("HTTP server shutdown gracefully")
 	return nil
 }
 

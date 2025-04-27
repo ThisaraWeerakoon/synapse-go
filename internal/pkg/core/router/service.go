@@ -29,6 +29,7 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -241,7 +242,7 @@ func (rs *RouterService) createQueryParamMiddleware(resource artifacts.Resource,
 }
 
 // startServer starts the HTTP server
-func (rs *RouterService) StartServer(ctx context.Context) error {
+func (rs *RouterService) StartServer(ctx context.Context) {
 	//eg:- localhost:8290
 	addr := rs.hostname + rs.port
 	rs.server = &http.Server{
@@ -256,22 +257,24 @@ func (rs *RouterService) StartServer(ctx context.Context) error {
 	// Start the server in a goroutine
 	go func() {
 		rs.logger.Info("Starting HTTP server", "address", addr)
-		if err := rs.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := rs.server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			rs.logger.Error("HTTP server error", slog.String("error", err.Error()))
 		}
+		rs.logger.Info("HTTP server stopped serving new connections")
 	}()
+}
 
-	// Start a goroutine to monitor context cancellation and shut down server
-	go func() {
-		<-ctx.Done()
-		rs.logger.Info("Shutting down HTTP server...")
-		// Shutdown the server gracefully
-		if err := rs.server.Shutdown(ctx); err != nil {
+func (rs *RouterService) StopServer() {
+	if rs.server != nil {
+		rs.logger.Info("Shutting down HTTP  server...")
+		shutdownCtx, shutdownRelease := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownRelease()
+		if err := rs.server.Shutdown(shutdownCtx); err != nil {
 			rs.logger.Error("Error shutting down HTTP server", "error", err.Error())
 		}
-	}()
-	return nil
+	}
 }
+
 
 // registerHealthEndpoints registers health and liveness endpoints
 func (rs *RouterService) registerLivelinessEndpoint() {
