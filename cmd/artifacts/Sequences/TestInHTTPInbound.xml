@@ -3,4 +3,5 @@
     <log category="INFO">
         <message>message from http inbound</message>
     </log>
+    <respond/>
 </sequence>
