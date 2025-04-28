@@ -22,13 +22,17 @@ package http
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/apache/synapse-go/internal/app/core/domain"
 	"github.com/apache/synapse-go/internal/app/core/ports"
+	"github.com/apache/synapse-go/internal/pkg/core/artifacts"
 	"github.com/apache/synapse-go/internal/pkg/core/synctx"
+	"github.com/apache/synapse-go/internal/pkg/core/utils"
 	"github.com/apache/synapse-go/internal/pkg/loggerfactory"
 )
 
@@ -103,13 +107,38 @@ func (h *HTTPInboundEndpoint) Start(ctx context.Context, mediator ports.InboundM
 		w.Write([]byte(`{"message": "Inbound Mediation successful"}`))
 	})
 
-	port := h.config.Parameters["inbound.http.port"]
+	inboundPortStr := h.config.Parameters["inbound.http.port"]
 
-	// Ensure the port has the proper format with colon prefix
-	listenAddr := ":" + port
-	if port[0] == ':' {
-		listenAddr = port // Port already has colon prefix
+	// Convert port to integer
+	inboundServerPort, err := strconv.Atoi(inboundPortStr)
+	if err != nil {
+		h.logger.Error("Invalid port configuration", "port", inboundPortStr, "error", err)
+		return errors.New("invalid inbound HTTP port configuration")
 	}
+	
+
+	var hostname string
+	// Get config context from the context
+	configCtx := ctx.Value(utils.ConfigContextKey).(*artifacts.ConfigContext)
+
+	if serverConfig, ok := configCtx.DeploymentConfig["server"].(map[string]string); ok {
+		hostname = serverConfig["hostname"]
+		if offsetStr, offsetExists := serverConfig["offset"]; offsetExists {
+			if offsetInt, err := strconv.Atoi(offsetStr); err == nil {
+				inboundServerPort += offsetInt
+				h.logger.Info("Using port offset", "offset", offsetInt, "final_port", inboundServerPort)
+			} else {
+				h.logger.Warn("Warning: Invalid offset value, using default port", "offset", offsetStr)
+			}
+		}
+	}
+
+	// Convert the port to a string format expected by the HTTP server
+	listenPort := fmt.Sprintf(":%d", inboundServerPort)
+
+	//eg:- localhost:8290
+	listenAddr := hostname + listenPort
+
 
 	// Create a new HTTP server
 	h.server = &http.Server{
