@@ -23,6 +23,9 @@ type MsgContext struct {
 	Properties map[string]interface{}
 	Message    Message
 	Headers    map[string]string
+
+	// processedPayload interface{} //A cached, parsed representation (see PayloadObject). This is populated on first access or query.
+	// payloadLock sync.RWMutex // To control concurrent access/parsing of processedPayload.
 }
 
 type Message struct {
