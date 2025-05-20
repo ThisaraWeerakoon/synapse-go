@@ -54,13 +54,17 @@ func Run(ctx context.Context) error {
 	conCtx := artifacts.GetConfigContext()
 	ctx = context.WithValue(ctx, utils.ConfigContextKey, conCtx)
 
-	exePath, err := os.Executable()
-	if err != nil {
-		log.Fatalf("Error getting executable path: %s", err.Error())
+	// Check if SYNAPSE_CONF_PATH environment variable is set
+	confPath := os.Getenv("SYNAPSE_CONF_PATH")
+	if confPath == "" {
+		// If not set, fall back to path relative to the executable
+		exePath, err := os.Executable()
+		if err != nil {
+			log.Fatalf("Error getting executable path: %s", err.Error())
+		}
+		binDir := filepath.Dir(exePath)
+		confPath = filepath.Join(binDir, "..", "conf")
 	}
-
-	binDir := filepath.Dir(exePath)
-	confPath := filepath.Join(binDir, "..", "conf")
 
 	errConfig := config.InitializeConfig(ctx, confPath)
 	if errConfig != nil {
@@ -90,10 +94,22 @@ func Run(ctx context.Context) error {
 	// Initialize the router service with the calculated port
 	routerService := router.NewRouterService(listenPort, hostname)
 
-	artifactsPath := filepath.Join(binDir, "..", "artifacts")
+	// Check if SYNAPSE_HOME environment variable is set
+	var artifactsPath string
+	synapseHome := os.Getenv("SYNAPSE_HOME")
+	if synapseHome != "" {
+		artifactsPath = filepath.Join(synapseHome, "artifacts")
+	} else {
+		exePath, err := os.Executable()
+		if err != nil {
+			log.Fatalf("Error getting executable path: %s", err.Error())
+		}
+		binDir := filepath.Dir(exePath)
+		artifactsPath = filepath.Join(binDir, "..", "artifacts")
+	}
+
 	deployer := deployers.NewDeployer(artifactsPath, mediationEngine, routerService)
-	err = deployer.Deploy(ctx)
-	if err != nil {
+	if err := deployer.Deploy(ctx); err != nil {
 		log.Printf("Error deploying artifacts: %v", err)
 	}
 
